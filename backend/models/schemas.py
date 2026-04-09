@@ -137,5 +137,9 @@ class VerificationResult(BaseModel):
     damage_summary: Optional[str] = Field(default=None, description="Human-readable summary of detected damage.")
     # ── Geo fields ──
     geo_flags: List[str] = Field(default_factory=list, description="Geolocation flags: 'no_exif_data' | 'location_mismatch' | 'stale_image'.")
-    location_distance_km: Optional[float] = Field(default=None, description="Max distance (km) between image EXIF GPS and user's claimed location.")
     image_age_days: Optional[float] = Field(default=None, description="Age of the oldest submitted photo in days relative to submission_timestamp.")
+    # ── Scoring fields ──
+    geo_risk_score: float = Field(default=0.0, description="0.0 = safe, 1.0 = high risk location mismatch.")
+    time_risk_score: float = Field(default=0.0, description="0.0 = recent, 1.0 = very old or future timestamp.")
+    confidence_score: float = Field(default=0.0, ge=0.0, le=1.0, description="Aggregate trust score. High is better.")
+    ui_result: Optional[Dict[str, Any]] = Field(default=None, description="UI-friendly status and guidance (Safe for Premium UX).")
