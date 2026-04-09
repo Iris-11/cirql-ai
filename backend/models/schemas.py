@@ -49,3 +49,4 @@ class ConditionResponse(BaseModel):
     suggested_price: float = Field(description="Recommended resale price in same currency as original_price")
     report_text: str = Field(description="Professional 2-3 sentence condition summary")
     eligible_for_resale: bool = Field(description="Whether item qualifies for resale")
+    ws_approved: bool = Field(description="True if score > 20, False otherwise")

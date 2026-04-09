@@ -98,5 +98,9 @@ async def generate_condition_report(request: ConditionRequest) -> ConditionRespo
     raw_text = message.content[0].text
     parsed_dict = _extract_json(raw_text)
 
+    # Calculate ws_approved: false if score is between 0-20, true otherwise
+    score = parsed_dict.get("score", 0)
+    parsed_dict["ws_approved"] = score > 20
+
     # Validate Claude's output against our schema
     return ConditionResponse(**parsed_dict)

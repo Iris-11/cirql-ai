@@ -1,0 +1,3 @@
+SUCCESS: Supabase client initialized.
+SUCCESS: Successfully reached Supabase Auth API.
+WARNING: Database reached, but returned an unusual error: {'message': "Could not find the table 'public._connection_test' in the schema cache", 'code': 'PGRST205', 'hint': None, 'details': None}

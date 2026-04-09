@@ -77,5 +77,9 @@ async def generate_condition_report_gemini(request: ConditionRequest) -> Conditi
     raw_text = response.text
     parsed_dict = extract_json_block(raw_text)
 
+    # Calculate ws_approved: false if score is between 0-20, true otherwise
+    score = parsed_dict.get("score", 0)
+    parsed_dict["ws_approved"] = score > 20
+
     # Validate the dictionary against our schema -> ensures keys are present
     return ConditionResponse(**parsed_dict)
