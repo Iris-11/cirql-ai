@@ -5,7 +5,7 @@ main.py — cirql-ai FastAPI application entrypoint.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.routes import e2_condition
+from routes import e2_condition
 
 app = FastAPI(
     title="cirql-ai — Product Lifecycle Intelligence API",

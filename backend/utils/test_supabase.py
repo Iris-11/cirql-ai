@@ -1,4 +1,4 @@
-from backend.utils.supabase_client import get_supabase_client
+from utils.supabase_client import get_supabase_client
 import sys
 
 def test_connection():

@@ -1,5 +1,5 @@
 from supabase import create_client, Client
-from backend.config import SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
+from config import SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY
 
 def get_supabase_client(use_admin: bool = False) -> Client:
     """

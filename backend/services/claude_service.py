@@ -6,9 +6,9 @@ import json
 import re
 import anthropic
 
-from backend.models.schemas import ConditionRequest, ConditionResponse
-from backend.utils.constants import E2_SYSTEM_PROMPT
-from backend.config import settings
+from models.schemas import ConditionRequest, ConditionResponse
+from utils.constants import E2_SYSTEM_PROMPT
+from config import settings
 
 
 def _extract_json(raw: str) -> dict:
@@ -58,12 +58,12 @@ def _build_user_message(request: ConditionRequest) -> list:
     passport_text = (
         f"Product ID: {request.product_id or 'N/A'}\n"
         f"Product Passport:\n"
-        f"  - Brand/Name: {passport.brand} {passport.product_name}\n"
+        f"  - Brand/Name: {passport.brand} {passport.name}\n"
         f"  - Category: {passport.category}\n"
         f"  - Age: {passport.age_in_months} months\n"
-        f"  - Original Price: {passport.original_price}\n"
+        f"  - Retail Price (USD): {passport.retail_price_usd}\n"
         f"  - Materials: {materials_str}\n"
-        f"  - Origin: {passport.origin}\n"
+        f"  - Origin: {passport.origin_country}\n"
         f"  - Certifications: {certs_str}\n"
         f"  - Usage History: {passport.usage_history}\n"
         f"  - Known Issues: {passport.known_issues}\n"

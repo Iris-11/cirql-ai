@@ -6,10 +6,10 @@ import json
 import google.generativeai as genai
 from typing import Dict, Any
 
-from backend.models.schemas import ConditionRequest, ConditionResponse
-from backend.utils.constants import GEMINI_SYSTEM_PROMPT
-from backend.config import settings
-from backend.utils.validators import extract_json_block
+from models.schemas import ConditionRequest, ConditionResponse
+from utils.constants import GEMINI_SYSTEM_PROMPT
+from config import settings
+from utils.validators import extract_json_block
 
 # Configure Gemini with the API Key
 genai.configure(api_key=settings.GEMINI_API_KEY)
@@ -39,12 +39,12 @@ def _build_user_message(request: ConditionRequest) -> str:
         f"Submission Time: {request.submission_timestamp or 'N/A'}\n\n"
         f"Product Passport Metadata:\n"
         f"- Brand: {passport.brand or 'N/A'}\n"
-        f"- Name: {passport.product_name or 'N/A'}\n"
+        f"- Name: {passport.name or 'N/A'}\n"
         f"- Category: {passport.category or 'N/A'}\n"
         f"- Age: {passport.age_in_months} months\n"
-        f"- Original Price: {passport.original_price or 'N/A'}\n"
+        f"- Retail Price (USD): {passport.retail_price_usd or 'N/A'}\n"
         f"- Materials: {materials_str}\n"
-        f"- Origin: {passport.origin or 'N/A'}\n"
+        f"- Origin: {passport.origin_country or 'N/A'}\n"
         f"- Certifications: {certs_str}\n"
         f"- Usage History: {passport.usage_history or 'N/A'}\n"
         f"- Known Issues: {passport.known_issues or 'None reported'}\n"
