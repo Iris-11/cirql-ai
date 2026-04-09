@@ -116,6 +116,8 @@ def validate_geo(
         max_distance_km     float   — Worst-case distance from user's location
         max_age_days        float   — Oldest photo age in days vs submission time
         flags               list    — "no_exif_data" | "location_mismatch" | "stale_image"
+        geo_risk_score      float   — Risk score (0.0 to 1.0) based on distance
+        time_risk_score     float   — Risk score (0.0 to 1.0) based on age
     """
     result = {
         "has_exif": False,
@@ -124,6 +126,8 @@ def validate_geo(
         "max_distance_km": None,
         "max_age_days": None,
         "flags": [],
+        "geo_risk_score": 0.0,
+        "time_risk_score": 0.0,
     }
 
     # Parse submission timestamp once
@@ -155,9 +159,11 @@ def validate_geo(
         if photo_dt:
             datetimes_found.append(photo_dt)
 
-    # ── GPS check ──
+    # ── GPS check & Risk Scoring ──
     if not coords_found:
         result["flags"].append("no_exif_data")
+        # Lack of metadata is itself a minor risk (0.2)
+        result["geo_risk_score"] = 0.2
     else:
         result["has_exif"] = True
         result["exif_coords"] = coords_found
@@ -169,13 +175,27 @@ def validate_geo(
             ]
             max_dist = max(distances)
             result["max_distance_km"] = round(max_dist, 2)
-            if max_dist > LOCATION_MISMATCH_THRESHOLD_KM:
+
+            # Probabilistic Scoring:
+            # < 50 km    → 0.0 risk
+            # 50–200 km  → 0.3 risk
+            # > 200 km   → 0.6 risk
+            if max_dist < 50:
+                result["geo_risk_score"] = 0.0
+            elif max_dist <= 200:
+                result["geo_risk_score"] = 0.3
+                # Keep compatibility with binary flags if > threshold
+                if max_dist > LOCATION_MISMATCH_THRESHOLD_KM:
+                    result["flags"].append("location_mismatch")
+            else:
+                result["geo_risk_score"] = 0.6
                 result["flags"].append("location_mismatch")
 
-    # ── Timestamp check ──
+    # ── Timestamp check & Risk Scoring ──
     if not datetimes_found:
-        # Not flagged here — many legitimate photos lack DateTimeOriginal
         result["has_datetime_exif"] = False
+        # Missing temporal metadata is a minor risk
+        result["time_risk_score"] = 0.1
     else:
         result["has_datetime_exif"] = True
         if submission_dt:
@@ -186,10 +206,24 @@ def validate_geo(
             max_age = max(ages_days)
             result["max_age_days"] = round(max_age, 1)
 
-            if max_age > STALE_IMAGE_THRESHOLD_DAYS:
+            # Probabilistic Scoring:
+            # < 30 days    → 0.0 risk
+            # 30–180 days  → 0.3 risk
+            # > 180 days   → 0.6 risk
+            if max_age < 30:
+                result["time_risk_score"] = 0.0
+            elif max_age <= 180:
+                result["time_risk_score"] = 0.3
+                if max_age > STALE_IMAGE_THRESHOLD_DAYS:
+                    result["flags"].append("stale_image")
+            else:
+                result["time_risk_score"] = 0.6
                 result["flags"].append("stale_image")
-            elif max_age < 0:
-                # Photo timestamp is in the future → definitely manipulated
-                result["flags"].append("stale_image")
+
+            # Hard Fraud: Future timestamp
+            if max_age < 0:
+                result["time_risk_score"] = 1.0
+                if "stale_image" not in result["flags"]:
+                    result["flags"].append("stale_image")
 
     return result

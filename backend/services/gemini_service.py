@@ -257,10 +257,13 @@ async def verify_product(submission: ProductSubmission) -> VerificationResult:
     geo_flags = geo_result["flags"]
     location_distance_km = geo_result.get("max_distance_km")
     image_age_days = geo_result.get("max_age_days")
+    geo_risk = geo_result.get("geo_risk_score", 0.0)
+    time_risk = geo_result.get("time_risk_score", 0.0)
 
     print(f"[gemini_service] Geo check -> has_exif={geo_result['has_exif']}, "
           f"has_datetime={geo_result['has_datetime_exif']}, "
           f"max_dist={location_distance_km}km, age={image_age_days}d, flags={geo_flags}")
+    print(f"[gemini_service] Risk Scores -> geo={geo_risk}, time={time_risk}")
 
     # ── Step 3: Gemini Vision Call (Using Stable 1.5 Flash for better Quota) ──
     has_reference = ref_part is not None
@@ -289,18 +292,34 @@ async def verify_product(submission: ProductSubmission) -> VerificationResult:
             # Merge geo flags
             all_flags = list(set(parsed.get("flags", []) + geo_flags))
 
-            # Hard blocks from geo checks
-            if "location_mismatch" in geo_flags:
-                parsed["authenticity_score"] = min(parsed.get("authenticity_score", 1.0), 0.4)
-                parsed["proceed"] = False
-            if "stale_image" in geo_flags:
-                parsed["proceed"] = False
+            # ── Probabilistic Confidence Scoring ──
+            auth_score = parsed.get("authenticity_score", 0.0)
+            is_complete = parsed.get("complete", False)
+            
+            # Formula: 0.5*auth + 0.2*complete + 0.2*(1-geo_risk) + 0.1*(1-time_risk)
+            confidence = (
+                0.5 * auth_score +
+                0.2 * (1.0 if is_complete else 0.0) +
+                0.2 * (1.0 - geo_risk) +
+                0.1 * (1.0 - time_risk)
+            )
+            confidence = max(0.0, min(1.0, confidence))
+
+            # Decide 'proceed' based on confidence threshold (e.g., 0.7)
+            proceed = confidence >= 0.7
+            if "location_mismatch" in geo_flags and geo_risk > 0.5:
+                proceed = False
+            if "stale_image" in geo_flags and time_risk > 0.5:
+                proceed = False
 
             return VerificationResult(
-                **{**parsed, "flags": all_flags},
+                **{**parsed, "flags": all_flags, "proceed": proceed},
                 geo_flags=geo_flags,
                 location_distance_km=location_distance_km,
                 image_age_days=image_age_days,
+                geo_risk_score=geo_risk,
+                time_risk_score=time_risk,
+                confidence_score=round(confidence, 3)
             )
 
         except Exception as e:
@@ -317,13 +336,16 @@ async def verify_product(submission: ProductSubmission) -> VerificationResult:
                 return VerificationResult(
                     complete=False,
                     authenticity_score=0.0,
+                    confidence_score=0.0,
                     missing_angles=[],
-                    flags=["system_processing_error"] + geo_flags,
+                    flags=["manual_review_required"] + geo_flags,
                     proceed=False,
                     sku_match=False,
                     damage_detected=False,
-                    damage_summary="Verification could not be completed due to a processing error.",
+                    damage_summary="Verification could not be completed automatically. Fallback to manual review.",
                     geo_flags=geo_flags,
                     location_distance_km=location_distance_km,
                     image_age_days=image_age_days,
+                    geo_risk_score=geo_risk,
+                    time_risk_score=time_risk,
                 )
