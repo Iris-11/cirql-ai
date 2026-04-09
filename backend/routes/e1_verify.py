@@ -7,7 +7,7 @@ Endpoint: POST /api/v1/product/verify-images
 from fastapi import APIRouter, HTTPException
 from models.schemas import ProductSubmission, VerificationResult
 from services.gemini_service import verify_product
-from services.supabase_client import save_e1_result
+from utils.supabase_client import save_e1_result
 
 router = APIRouter()
 

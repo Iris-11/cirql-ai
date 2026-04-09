@@ -258,7 +258,7 @@ async def verify_product(submission: ProductSubmission) -> VerificationResult:
     location_distance_km = geo_result.get("max_distance_km")
     image_age_days = geo_result.get("max_age_days")
 
-    print(f"[gemini_service] Geo check → has_exif={geo_result['has_exif']}, "
+    print(f"[gemini_service] Geo check -> has_exif={geo_result['has_exif']}, "
           f"has_datetime={geo_result['has_datetime_exif']}, "
           f"max_dist={location_distance_km}km, age={image_age_days}d, flags={geo_flags}")
 
