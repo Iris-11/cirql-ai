@@ -1,10 +1,10 @@
 """
-gemini_service.py — E1 Verification Engine using Gemini Vision.
+gemini_service.py — E1 Verification Engine using Groq Vision (Llama 4 Scout).
 
 Pipeline:
   1. Download all submitted images + optional reference SKU image (concurrent)
   2. Run EXIF GPS extraction on raw bytes → geo validation against user_location
-  3. Run 3-part multimodal Gemini prompt:
+  3. Run multimodal Groq prompt:
      a) Authenticity & angle completeness
      b) SKU visual match vs. reference image
      c) Damage & condition assessment
@@ -14,10 +14,9 @@ Pipeline:
 
 import os
 import json
-import base64
 import asyncio
 import httpx
-import google.generativeai as genai
+from groq import AsyncGroq
 from typing import Optional, List, Tuple
 from dotenv import load_dotenv
 
@@ -26,29 +25,25 @@ load_dotenv()
 from models.schemas import ProductSubmission, VerificationResult
 from utils.geo_utils import validate_geo
 
-# ── Configure Gemini ──────────────────────────────────────────────────────────
-_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-if _API_KEY:
-    genai.configure(api_key=_API_KEY)
+# ── Configure Groq ────────────────────────────────────────────────────────────
+_API_KEY = os.environ.get("GROQ_API_KEY", "")
+_client = AsyncGroq(api_key=_API_KEY) if _API_KEY else None
 
+VISION_MODEL = "meta-llama/llama-4-scout-17b-16e-instruct"
 REQUIRED_ANGLES = ["top view", "bottom view", "side-left", "side-right", "front view"]
 
 
 # ── Image Utility ─────────────────────────────────────────────────────────────
 
-async def _fetch_image(url: str, client: httpx.AsyncClient) -> Optional[Tuple[dict, bytes]]:
+async def _fetch_image(url: str, client: httpx.AsyncClient) -> Optional[bytes]:
     """
     Fetch an image from a URL.
-    Returns (gemini_inline_data_part, raw_bytes) or None on failure.
-    raw_bytes are needed for EXIF extraction.
+    Returns raw bytes or None on failure.
     """
     try:
         r = await client.get(url, timeout=15.0, follow_redirects=True)
         r.raise_for_status()
-        raw = r.content
-        mime = r.headers.get("content-type", "image/jpeg").split(";")[0].strip()
-        inline_data = {"mime_type": mime, "data": base64.b64encode(raw).decode("utf-8")}
-        return inline_data, raw
+        return r.content
     except Exception as e:
         print(f"[gemini_service] Failed to fetch {url}: {e}")
         return None
@@ -58,17 +53,13 @@ async def _fetch_all_images(
     submission: ProductSubmission,
 ) -> Tuple[List[dict], List[bytes], Optional[dict]]:
     """
-    Concurrently fetch all submitted images and the optional reference SKU image.
-    Picks best available reference angle from passport.reference_images dict
-    (priority: front > top > side_left > any first key).
+    Concurrently fetch submitted images (raw bytes for EXIF only).
+    Groq content parts use the original public URLs to avoid 413 errors.
     Returns:
-        submitted_parts   — list of labeled Gemini content parts
+        submitted_parts   — list of Groq content parts (text label + image_url using original URLs)
         raw_bytes_list    — raw bytes for each submitted image (for EXIF extraction)
-        ref_part          — Gemini inline_data for reference image or None
+        ref_part          — Groq image_url part for reference image or None
     """
-    urls = [(img.url, img.label) for img in submission.images]
-
-    # Pick the best reference image from the dict (DB stores one per angle)
     ref_url: Optional[str] = None
     ref_images = submission.passport.reference_images
     if ref_images:
@@ -77,33 +68,38 @@ async def _fetch_all_images(
             if angle in ref_images:
                 ref_url = ref_images[angle]
                 break
-        if not ref_url:  # fallback to first key
+        if not ref_url:
             ref_url = next(iter(ref_images.values()))
 
+    # Llama 4 Scout supports max 5 images total. Reserve 1 slot for reference if present.
+    MAX_IMAGES = 4 if ref_url else 5
+    all_images = submission.images[:MAX_IMAGES]
+    urls = [(img.url, img.label) for img in all_images]
+
+    # Download submitted images for EXIF extraction only (not for Groq payload)
     async with httpx.AsyncClient() as client:
         tasks = [_fetch_image(url, client) for url, _ in urls]
-        if ref_url:
-            tasks.append(_fetch_image(ref_url, client))
         results = await asyncio.gather(*tasks)
-
-    n = len(urls)
-    submitted_results = results[:n]
-    ref_result = results[n] if ref_url else None
 
     submitted_parts: List[dict] = []
     raw_bytes_list: List[bytes] = []
 
-    for (url, label), fetch_result in zip(urls, submitted_results):
+    for (url, label), fetch_result in zip(urls, results):
         if fetch_result:
-            inline_data, raw = fetch_result
-            submitted_parts.append(f"[IMAGE ANGLE: {label}]")
-            submitted_parts.append({"inline_data": inline_data})
-            raw_bytes_list.append(raw)
+            raw_bytes_list.append(fetch_result)
+            # Pass URL directly to Groq — avoids base64 bloat and 413 errors
+            submitted_parts.append({"type": "text", "text": f"[IMAGE ANGLE: {label}]"})
+            submitted_parts.append({
+                "type": "image_url",
+                "image_url": {"url": url}
+            })
 
     ref_part = None
-    if ref_result:
-        inline_data, _ = ref_result
-        ref_part = {"inline_data": inline_data}
+    if ref_url:
+        ref_part = {
+            "type": "image_url",
+            "image_url": {"url": ref_url}
+        }
 
     return submitted_parts, raw_bytes_list, ref_part
 
@@ -190,14 +186,12 @@ If no damage: set damage_summary to null.
 
 ---
 
-### HALLUCINATION GUARD — STRICT RULES
+### STRICT OUTPUT RULES
 1. Return ONLY valid JSON. No markdown fences, no prose outside the JSON.
 2. Valid flags ONLY: "missing_angles", "low_authenticity", "possible_stock_images",
    "category_mismatch", "sku_mismatch", "inconsistent_images", "insufficient_images"
 3. "damage_summary" MUST reference a specific labeled angle or be null.
 4. If uncertain → be conservative, set proceed = false.
-
----
 
 Respond ONLY with this exact JSON (no extra keys, no missing keys):
 {{
@@ -220,11 +214,11 @@ async def verify_product(submission: ProductSubmission) -> VerificationResult:
     Full E1 pipeline:
       1. Fetch images concurrently
       2. Run EXIF geo validation
-      3. Call Gemini (with 1 retry on failure)
+      3. Call Groq Vision (with 1 retry on failure)
       4. Merge geo flags and return VerificationResult
     """
-    if not _API_KEY:
-        raise RuntimeError("GEMINI_API_KEY is not configured in .env")
+    if not _client:
+        raise RuntimeError("GROQ_API_KEY is not configured in .env")
 
     # ── Step 1: Download images ──
     submitted_parts, raw_bytes_list, ref_part = await _fetch_all_images(submission)
@@ -262,29 +256,27 @@ async def verify_product(submission: ProductSubmission) -> VerificationResult:
           f"has_datetime={geo_result['has_datetime_exif']}, "
           f"max_dist={location_distance_km}km, age={image_age_days}d, flags={geo_flags}")
 
-    # ── Step 3: Gemini Vision Call (Using Stable 1.5 Flash for better Quota) ──
+    # ── Step 3: Build message content ──
     has_reference = ref_part is not None
-    prompt = _build_prompt(submission, has_reference)
+    prompt_text = _build_prompt(submission, has_reference)
 
-    contents = [prompt] + submitted_parts
+    content: List[dict] = [{"type": "text", "text": prompt_text}]
+    content.extend(submitted_parts)
     if has_reference:
-        contents.append("[REFERENCE IMAGE — canonical product from WS catalog:]")
-        contents.append(ref_part)
+        content.append({"type": "text", "text": "[REFERENCE IMAGE — canonical product from WS catalog:]"})
+        content.append(ref_part)
 
-    model = genai.GenerativeModel(
-        model_name="gemini-1.5-flash-latest",
-        generation_config={
-            "response_mime_type": "application/json",
-            "temperature": 0.0,
-        },
-    )
-
-    # ── Step 4: Call with hallucination-guard retry & 429 handling ──
+    # ── Step 4: Call Groq with retry ──
     for attempt in range(2):
         try:
             print(f"[gemini_service] Starting Full Product Verification (Attempt {attempt + 1})...")
-            response = await model.generate_content_async(contents)
-            parsed = json.loads(response.text)
+            response = await _client.chat.completions.create(
+                model=VISION_MODEL,
+                messages=[{"role": "user", "content": content}],
+                temperature=0.0,
+                response_format={"type": "json_object"},
+            )
+            parsed = json.loads(response.choices[0].message.content)
 
             # Merge geo flags
             all_flags = list(set(parsed.get("flags", []) + geo_flags))
@@ -306,12 +298,10 @@ async def verify_product(submission: ProductSubmission) -> VerificationResult:
         except Exception as e:
             error_msg = str(e)
             print(f"[gemini_service] Attempt {attempt + 1} failed: {error_msg}")
-            
-            # If hit rate limit, wait a bit before the second attempt
+
             if "429" in error_msg and attempt == 0:
-                wait_time = 5
-                print(f"[gemini_service] Rate limit hit. Waiting {wait_time}s before automatic retry...")
-                await asyncio.sleep(wait_time)
+                print("[gemini_service] Rate limit hit. Waiting 5s before retry...")
+                await asyncio.sleep(5)
 
             if attempt == 1:
                 return VerificationResult(
