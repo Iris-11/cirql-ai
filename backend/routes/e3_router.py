@@ -3,6 +3,8 @@ from models.schemas import RoutingRequest, RoutingResponse, Impact
 from services.e3_service import get_routing_decision
 from utils.constants import PARTNERS, EMISSION_FACTOR, LANDFILL_FACTOR
 from utils.validators import validate_ai_response
+from models.schemas import CategorizedPartners
+from services.routing_service import get_categorized_partners
 
 router = APIRouter()
 
@@ -37,3 +39,15 @@ async def route_product(request: RoutingRequest):
             landfill_diverted_kg=landfill
         )
     )
+
+@router.get(
+    "/partners",
+    response_model=CategorizedPartners,
+    summary="Get all service partners grouped by type",
+    description="Fetches a list of all active Donate and Recycle partners from the database."
+)
+async def get_partners_endpoint():
+    try:
+        return await get_categorized_partners()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to fetch partners: {str(e)}")

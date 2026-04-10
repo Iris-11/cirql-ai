@@ -4,13 +4,19 @@ user.py — User-specific data endpoints.
 GET /api/v1/user/{customer_id}/passports
   - Returns all passports owned by the customer, joined with skus + brand name
   - Used by the mobile app to show "My Products" before verification
+
+GET /api/v1/user/profile   ?email=...
+GET /api/v1/user/impact    ?email=...
+GET /api/v1/user/history   ?email=...
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Optional, List, Dict
 
 from utils.supabase_client import get_supabase_client
+from models.schemas import UserProfile, UserImpactSummary, PurchaseHistoryItem
+from services.user_service import get_user_profile, get_user_impact, get_purchase_history
 
 router = APIRouter()
 
@@ -82,3 +88,42 @@ def get_user_passports(customer_id: str):
         ))
 
     return passports
+
+
+@router.get(
+    "/profile",
+    response_model=UserProfile,
+    summary="Get user profile by email",
+    description="Returns user data including name, city, and badges."
+)
+async def get_profile(email: str = Query(..., description="User's unique email address")):
+    try:
+        return await get_user_profile(email)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+
+
+@router.get(
+    "/impact",
+    response_model=UserImpactSummary,
+    summary="Get user sustainability impact",
+    description="Returns aggregate circular economy metrics for the user."
+)
+async def get_impact(email: str = Query(..., description="User's unique email address")):
+    try:
+        return await get_user_impact(email)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Impact calculation error: {str(e)}")
+
+
+@router.get(
+    "/history",
+    response_model=list[PurchaseHistoryItem],
+    summary="Get user purchase history",
+    description="Returns list of all products currently owned by the user."
+)
+async def get_history(email: str = Query(..., description="User's unique email address")):
+    try:
+        return await get_purchase_history(email)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"History fetch error: {str(e)}")

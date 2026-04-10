@@ -230,3 +230,53 @@ class FullPipelineResult(BaseModel):
     e1_result: VerificationResult
     e2_result: ConditionResponse
     e3_result: Optional[RoutingResponse] = Field(default=None, description="E3 routing result. None if pending_review=True.")
+
+class UserProfile(BaseModel):
+    id: Optional[str] = None
+    name: Optional[str] = None
+    city: Optional[str] = None
+    email: str
+    store_credit_usd: float = 0.0
+    reward_points: int = 0
+    green_badges: int = 0
+    is_secondary_buyer: bool = False
+
+
+class UserImpactSummary(BaseModel):
+    circular_impact_score: int = 0
+    heritage_level: str = "Pioneer"
+    co2_avoided_kg: float = 0.0
+    landfill_avoided_kg: float = 0.0
+    items_tracked: int = 0
+    items_resold: int = 0
+
+
+class PurchaseHistoryItem(BaseModel):
+    passport_id: str
+    product_name: str
+    sku_code: str
+    category: str
+    brand: str = ""
+    event_type: Optional[str] = "purchase"
+    purchase_date: str
+    retail_price_usd: float
+    sustainability_score: int
+    image_url: Optional[str] = None
+
+
+# ─────────────────────────────────────────────
+# ROUTING & PARTNERS SCHEMAS
+# ─────────────────────────────────────────────
+
+class Partner(BaseModel):
+    id: str
+    name: str
+    type: str
+    accepted_categories: List[str] = Field(default_factory=list)
+    min_condition_tier: Optional[str] = None
+    regions: List[str] = Field(default_factory=list)
+    active: bool = True
+
+class CategorizedPartners(BaseModel):
+    donate: List[Partner] = Field(default_factory=list)
+    recycle: List[Partner] = Field(default_factory=list)
