@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from routes import e1_verify, e2_condition, e1e2_pipeline
+from routes import e1_verify, e2_condition, e1e2_pipeline, e3_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -30,3 +30,6 @@ app.include_router(e2_condition.router, prefix="/api/v1/product-condition", tags
 
 # Combined pipeline
 app.include_router(e1e2_pipeline.router, prefix="/api/v1/product", tags=["E1+E2 — Full Assessment"])
+
+# E3 — Routing
+app.include_router(e3_router.router, prefix="/api/v1/routing", tags=["E3 — Routing"])

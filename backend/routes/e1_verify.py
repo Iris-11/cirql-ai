@@ -34,6 +34,12 @@ async def verify_images_endpoint(submission: ProductSubmission):
     try:
         result = await verify_product(submission)
 
+        # Echo E3 routing context into the response
+        result.product_id = submission.product_id
+        result.category = submission.passport.category
+        result.weight = submission.passport.weight
+        result.location = submission.location
+
         # Write result back to Supabase if listing_id was provided
         if submission.listing_id:
             await save_e1_result(submission.listing_id, result.model_dump())

@@ -6,6 +6,7 @@ Used across E1 (Verification) and E2 (Condition Grading) engines.
 
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Any
+from typing import Literal
 
 
 # ─────────────────────────────────────────────
@@ -38,6 +39,7 @@ class ProductPassport(BaseModel):
     brand: str
     name: str
     category: str
+    weight: Optional[float] = Field(default=None, description="Product weight in kg.")
     age_in_months: Optional[int] = None
     original_price: Optional[float] = None
     materials: Optional[List[str]] = None
@@ -73,6 +75,10 @@ class ProductSubmission(BaseModel):
     images: List[ProductImage] = Field(default_factory=list)
     passport: ProductPassport
     grading_rubric: Optional[GradingRubric] = None
+    location: Optional[str] = Field(
+        default=None,
+        description="Human-readable location for routing (e.g. 'San Francisco, CA'). Used by E3."
+    )
     user_location: Optional[UserLocation] = Field(
         default=None,
         description="Optional: user's current GPS location captured from browser for EXIF cross-validation."
@@ -144,12 +150,21 @@ class VerificationResult(BaseModel):
     time_risk_score: float = Field(default=0.0, description="0.0 = recent, 1.0 = very old or future timestamp.")
     confidence_score: float = Field(default=0.0, ge=0.0, le=1.0, description="Aggregate trust score. High is better.")
     ui_result: Optional[Dict[str, Any]] = Field(default=None, description="UI-friendly status and guidance (Safe for Premium UX).")
+    # ── E3 routing context (echoed from submission input) ──
+    product_id: Optional[str] = Field(default=None, description="Echoed from submission for E3 routing.")
+    category: Optional[str] = Field(default=None, description="Echoed from passport.category for E3 routing.")
+    weight: Optional[float] = Field(default=None, description="Echoed from passport.weight for E3 routing.")
+    location: Optional[str] = Field(default=None, description="Echoed from submission.location for E3 routing.")
 
 class ConditionRequest(BaseModel):
     product_id: Optional[str] = None
     submission_timestamp: Optional[str] = None
     passport: ProductPassport
     grading_rubric: Optional[Dict[str, str]] = None
+    location: Optional[str] = Field(
+        default=None,
+        description="Human-readable location for routing (e.g. 'San Francisco, CA'). Echoed in response for E3."
+    )
 
 
 class EvidenceItem(BaseModel):
@@ -167,6 +182,14 @@ class ConditionResponse(BaseModel):
     ws_approved: bool = True # Keep for logic, but default true
 
 
+class ConditionResponseFull(ConditionResponse):
+    """E2 response extended with E3 routing context echoed from the request."""
+    product_id: Optional[str] = Field(default=None, description="Echoed from request for E3 routing.")
+    category: Optional[str] = Field(default=None, description="Echoed from passport.category for E3 routing.")
+    weight: Optional[float] = Field(default=None, description="Echoed from passport.weight for E3 routing.")
+    location: Optional[str] = Field(default=None, description="Echoed from request.location for E3 routing.")
+
+
 # ─────────────────────────────────────────────
 # E1 + E2 — COMBINED PIPELINE SCHEMA
 # ─────────────────────────────────────────────
@@ -174,3 +197,22 @@ class ConditionResponse(BaseModel):
 class FullAssessmentResult(BaseModel):
     e1_result: VerificationResult = Field(..., description="E1 image verification output.")
     e2_result: ConditionResponse = Field(..., description="E2 condition grading output.")
+
+
+class RoutingRequest(BaseModel):
+    product_id: str
+    category: str
+    weight: float
+    location: str
+    condition_report: ConditionResponse
+
+class Impact(BaseModel):
+    co2_avoided_kg: float
+    landfill_diverted_kg: float
+
+
+class RoutingResponse(BaseModel):
+    action: Literal["resale", "donate", "recycle"]
+    partner: str
+    reason: str
+    impact: Impact
