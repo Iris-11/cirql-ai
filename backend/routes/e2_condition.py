@@ -8,8 +8,8 @@ from pydantic import ValidationError
 from models.schemas import ConditionRequest, ConditionResponse
 from services.e2_service import generate_condition_report_e2
 
-router = APIRouter(prefix="/evaluate-condition", tags=["E2 — Condition Agent"])
-
+#router = APIRouter(prefix="/evaluate-condition", tags=["E2 — Condition Agent"])
+router = APIRouter()
 
 @router.post(
     "",

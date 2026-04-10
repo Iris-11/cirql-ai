@@ -15,6 +15,7 @@ Pipeline:
 import os
 import json
 import asyncio
+import hashlib
 import httpx
 from groq import AsyncGroq
 from typing import Optional, List, Tuple
@@ -51,13 +52,13 @@ async def _fetch_image(url: str, client: httpx.AsyncClient) -> Optional[bytes]:
 
 async def _fetch_all_images(
     submission: ProductSubmission,
-) -> Tuple[List[dict], List[bytes], Optional[dict]]:
+) -> Tuple[List[dict], List[Tuple[str, bytes]], Optional[dict]]:
     """
-    Concurrently fetch submitted images (raw bytes for EXIF only).
+    Concurrently fetch submitted images (raw bytes for EXIF + duplicate detection).
     Groq content parts use the original public URLs to avoid 413 errors.
     Returns:
-        submitted_parts   — list of Groq content parts (text label + image_url using original URLs)
-        raw_bytes_list    — raw bytes for each submitted image (for EXIF extraction)
+        submitted_parts   — list of Groq content parts (text label + image_url)
+        raw_labeled       — list of (label, bytes) pairs for each successfully fetched image
         ref_part          — Groq image_url part for reference image or None
     """
     ref_url: Optional[str] = None
@@ -76,17 +77,17 @@ async def _fetch_all_images(
     all_images = submission.images[:MAX_IMAGES]
     urls = [(img.url, img.label) for img in all_images]
 
-    # Download submitted images for EXIF extraction only (not for Groq payload)
+    # Download submitted images for EXIF extraction + duplicate detection
     async with httpx.AsyncClient() as client:
         tasks = [_fetch_image(url, client) for url, _ in urls]
         results = await asyncio.gather(*tasks)
 
     submitted_parts: List[dict] = []
-    raw_bytes_list: List[bytes] = []
+    raw_labeled: List[Tuple[str, bytes]] = []
 
     for (url, label), fetch_result in zip(urls, results):
         if fetch_result:
-            raw_bytes_list.append(fetch_result)
+            raw_labeled.append((label, fetch_result))
             # Pass URL directly to Groq — avoids base64 bloat and 413 errors
             submitted_parts.append({"type": "text", "text": f"[IMAGE ANGLE: {label}]"})
             submitted_parts.append({
@@ -101,7 +102,35 @@ async def _fetch_all_images(
             "image_url": {"url": ref_url}
         }
 
-    return submitted_parts, raw_bytes_list, ref_part
+    return submitted_parts, raw_labeled, ref_part
+
+
+_SIDE_LABELS = {"side_left", "side-left", "side_right", "side-right"}
+
+
+def _detect_duplicates(raw_labeled: List[Tuple[str, bytes]]) -> Tuple[bool, bool]:
+    """
+    Hash-compare fetched images to detect duplicate submissions.
+    Returns:
+        has_side_only_dup  — True if only side_left/side_right are duplicates (minor)
+        has_severe_dup     — True if any non-side angles are duplicated (heavy penalty)
+    """
+    hash_to_labels: dict = {}
+    for label, raw_bytes in raw_labeled:
+        h = hashlib.md5(raw_bytes).hexdigest()
+        hash_to_labels.setdefault(h, []).append(label)
+
+    has_side_only_dup = False
+    has_severe_dup = False
+    for labels in hash_to_labels.values():
+        if len(labels) < 2:
+            continue
+        if set(labels).issubset(_SIDE_LABELS):
+            has_side_only_dup = True
+        else:
+            has_severe_dup = True
+
+    return has_side_only_dup, has_severe_dup
 
 
 # ── Prompt Builder ────────────────────────────────────────────────────────────
@@ -221,7 +250,7 @@ async def verify_product(submission: ProductSubmission) -> VerificationResult:
         raise RuntimeError("GROQ_API_KEY is not configured in .env")
 
     # ── Step 1: Download images ──
-    submitted_parts, raw_bytes_list, ref_part = await _fetch_all_images(submission)
+    submitted_parts, raw_labeled, ref_part = await _fetch_all_images(submission)
 
     if not submitted_parts:
         return VerificationResult(
@@ -237,6 +266,10 @@ async def verify_product(submission: ProductSubmission) -> VerificationResult:
             location_distance_km=None,
             image_age_days=None,
         )
+
+    # ── Step 1b: Duplicate image detection ──
+    has_side_only_dup, has_severe_dup = _detect_duplicates(raw_labeled)
+    raw_bytes_list = [b for _, b in raw_labeled]
 
     # ── Step 2: EXIF Geo Validation ──
     user_lat = submission.user_location.lat if submission.user_location else None
@@ -281,31 +314,66 @@ async def verify_product(submission: ProductSubmission) -> VerificationResult:
             )
             parsed = json.loads(response.choices[0].message.content)
 
-            # Merge geo flags
-            all_flags = list(set(parsed.get("flags", []) + geo_flags))
+            # Merge geo flags + duplicate flags
+            dup_flags = []
+            if has_severe_dup:
+                dup_flags.append("duplicate_images")
+            if has_side_only_dup:
+                dup_flags.append("duplicate_side_images")
+            all_flags = list(set(parsed.get("flags", []) + geo_flags + dup_flags))
 
             # ── Probabilistic Confidence Scoring ──
             auth_score = parsed.get("authenticity_score", 0.0)
             is_complete = parsed.get("complete", False)
-            
-            # Formula: 0.5*auth + 0.2*complete + 0.2*(1-geo_risk) + 0.1*(1-time_risk)
+
+            # Duplicate penalty: severe = -0.4, side-only = -0.1
+            dup_penalty = 0.4 if has_severe_dup else (0.1 if has_side_only_dup else 0.0)
+
+            # Formula: 0.5*auth + 0.2*complete + 0.2*(1-geo_risk) + 0.1*(1-time_risk) - dup_penalty
             confidence = (
                 0.5 * auth_score +
                 0.2 * (1.0 if is_complete else 0.0) +
                 0.2 * (1.0 - geo_risk) +
-                0.1 * (1.0 - time_risk)
+                0.1 * (1.0 - time_risk) -
+                dup_penalty
             )
             confidence = max(0.0, min(1.0, confidence))
 
-            # Decide 'proceed' based on confidence threshold (e.g., 0.7)
+            # Decide 'proceed' based on confidence threshold
             proceed = confidence >= 0.7
+            if has_severe_dup:
+                proceed = False
             if "location_mismatch" in geo_flags and geo_risk > 0.5:
                 proceed = False
             if "stale_image" in geo_flags and time_risk > 0.5:
                 proceed = False
 
+            # Override complete + set completeness_note when severe duplicates detected —
+            # the LLM sees labels not file identity, so it marks complete even when
+            # all images are the same file.
+            completeness_note: Optional[str] = None
+            if has_severe_dup:
+                parsed["complete"] = False
+                completeness_note = (
+                    "Identical images detected across multiple non-side angles. "
+                    "Each required angle must be a distinct photo of the product."
+                )
+            elif has_side_only_dup:
+                # complete can still be true, but flag the repetition
+                completeness_note = (
+                    "Left and right side images appear identical. "
+                    "Consider submitting separate photos for each side if they differ."
+                )
+            elif not parsed.get("complete", True):
+                missing = parsed.get("missing_angles", [])
+                completeness_note = (
+                    f"Missing required angles: {', '.join(missing)}."
+                    if missing else "One or more required angles could not be verified."
+                )
+
             return VerificationResult(
                 **{**parsed, "flags": all_flags, "proceed": proceed},
+                completeness_note=completeness_note,
                 geo_flags=geo_flags,
                 location_distance_km=location_distance_km,
                 image_age_days=image_age_days,

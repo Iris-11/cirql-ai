@@ -29,14 +29,14 @@ class Ownership(BaseModel):
     last_purchase_date: str
 
 
-class Passport(BaseModel):
+class ProductPassport(BaseModel):
     # ── Maps directly to skus + passports tables ──
     sku_code: Optional[str] = Field(
         default=None,
         description="SKU code from skus.sku_code (e.g. 'WS-PAN-001'). Used for DB lookup."
     )
     brand: str
-    product_name: str
+    name: str
     category: str
     age_in_months: Optional[int] = None
     original_price: Optional[float] = None
@@ -70,8 +70,8 @@ class ProductSubmission(BaseModel):
         description="resale_listings.id — if provided, the E1 result is automatically saved back to Supabase."
     )
     submission_timestamp: str
-    images: List[ProductImage]
-    passport: Passport
+    images: List[ProductImage] = Field(default_factory=list)
+    passport: ProductPassport
     grading_rubric: Optional[GradingRubric] = None
     user_location: Optional[UserLocation] = Field(
         default=None,
@@ -92,7 +92,7 @@ class ProductSubmission(BaseModel):
                 "passport": {
                     "sku_code": "WS-PAN-001",
                     "brand": "Williams-Sonoma",
-                    "product_name": "All-Clad D3 10in Skillet",
+                    "name": "All-Clad D3 10in Skillet",
                     "category": "cookware",
                     "age_in_months": 30,
                     "original_price": 179.95,
@@ -127,7 +127,8 @@ class ProductSubmission(BaseModel):
 # ─────────────────────────────────────────────
 
 class VerificationResult(BaseModel):
-    complete: bool = Field(..., description="True if all required angles are present.")
+    complete: bool = Field(..., description="True if all required angles are present with unique images.")
+    completeness_note: Optional[str] = Field(default=None, description="Explains why complete is false, or flags repetitive images.")
     authenticity_score: float = Field(..., ge=0.0, le=1.0, description="0.0 = fake/stock, 1.0 = genuine user photo.")
     missing_angles: List[str] = Field(default_factory=list, description="List of required angles that were not detected.")
     flags: List[str] = Field(default_factory=list, description="Policy violations detected, e.g. 'low_authenticity', 'category_mismatch'.")
@@ -143,3 +144,33 @@ class VerificationResult(BaseModel):
     time_risk_score: float = Field(default=0.0, description="0.0 = recent, 1.0 = very old or future timestamp.")
     confidence_score: float = Field(default=0.0, ge=0.0, le=1.0, description="Aggregate trust score. High is better.")
     ui_result: Optional[Dict[str, Any]] = Field(default=None, description="UI-friendly status and guidance (Safe for Premium UX).")
+
+class ConditionRequest(BaseModel):
+    product_id: Optional[str] = None
+    submission_timestamp: Optional[str] = None
+    passport: ProductPassport
+    grading_rubric: Optional[Dict[str, str]] = None
+
+
+class EvidenceItem(BaseModel):
+    claim: str = Field(description="Assertion made about the product condition")
+    source: str = Field(description="Specific photo label or passport field that supports the claim")
+
+
+class ConditionResponse(BaseModel):
+    tier: str
+    score: float
+    evidence: List[EvidenceItem]
+    suggested_price: float
+    report_text: str
+    eligible_for_resale: bool
+    ws_approved: bool = True # Keep for logic, but default true
+
+
+# ─────────────────────────────────────────────
+# E1 + E2 — COMBINED PIPELINE SCHEMA
+# ─────────────────────────────────────────────
+
+class FullAssessmentResult(BaseModel):
+    e1_result: VerificationResult = Field(..., description="E1 image verification output.")
+    e2_result: ConditionResponse = Field(..., description="E2 condition grading output.")

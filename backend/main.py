@@ -3,13 +3,30 @@ main.py — DEVELOPMENT ONLY test runner for e1_verify branch.
 Final main.py will be assembled on main branch.
 """
 
-from fastapi import FastAPI
+import logging
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 
 load_dotenv()
 
-from routes import e1_verify
+from routes import e1_verify, e2_condition, e1e2_pipeline
 
-app = FastAPI(title="E1 Verify — Dev Test")
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
+app = FastAPI(title="Cirql AI — Product Assessment Engine")
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.error("422 Validation error on %s %s: %s", request.method, request.url, exc.errors())
+    return JSONResponse(status_code=422, content={"detail": exc.errors()})
+
+# Individual engines
 app.include_router(e1_verify.router, prefix="/api/v1/product", tags=["E1 — Verification"])
+app.include_router(e2_condition.router, prefix="/api/v1/product-condition", tags=["E2 — Condition"])
+
+# Combined pipeline
+app.include_router(e1e2_pipeline.router, prefix="/api/v1/product", tags=["E1+E2 — Full Assessment"])

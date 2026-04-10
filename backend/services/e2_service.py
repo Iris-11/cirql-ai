@@ -6,14 +6,14 @@ import json
 from groq import AsyncGroq
 from models.schemas import ConditionRequest, ConditionResponse
 from utils.constants import GEMINI_SYSTEM_PROMPT
-from config import settings
+import os
 from utils.validators import extract_json_block
 
 # Initialize Async Groq client
 # Fallback to a placeholder if key is missing to avoid startup crash
 _client = None
-if settings.GROQ_API_KEY:
-    _client = AsyncGroq(api_key=settings.GROQ_API_KEY)
+if os.getenv("GROQ_API_KEY"):
+    _client = AsyncGroq(api_key=os.getenv("GROQ_API_KEY"))
 
 def _build_user_message(request: ConditionRequest) -> str:
     """
@@ -44,9 +44,9 @@ def _build_user_message(request: ConditionRequest) -> str:
         f"- Name: {passport.name or 'N/A'}\n"
         f"- Category: {passport.category or 'N/A'}\n"
         f"- Age: {passport.age_in_months} months\n"
-        f"- Retail Price (USD): {passport.retail_price_usd or 'N/A'}\n"
+        f"- Retail Price (USD): {passport.original_price or 'N/A'}\n"
         f"- Materials: {materials_str}\n"
-        f"- Origin: {passport.origin_country or 'N/A'}\n"
+        f"- Origin: {passport.origin or 'N/A'}\n"
         f"- Certifications: {certs_str}\n"
         f"- Usage History: {passport.usage_history or 'N/A'}\n"
         f"- Known Issues: {passport.known_issues or 'None reported'}\n"
