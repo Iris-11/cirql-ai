@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import ValidationError
 
 from models.schemas import ConditionRequest, ConditionResponse
-from services.groq_service import generate_condition_report_groq
+from services.e2_service import generate_condition_report_e2
 
 router = APIRouter(prefix="/evaluate-condition", tags=["E2 — Condition Agent"])
 
@@ -22,7 +22,7 @@ router = APIRouter(prefix="/evaluate-condition", tags=["E2 — Condition Agent"]
 )
 async def evaluate_condition(request: ConditionRequest) -> ConditionResponse:
     try:
-        result = await generate_condition_report_groq(request)
+        result = await generate_condition_report_e2(request)
     except ValidationError as exc:
         raise HTTPException(
             status_code=502,

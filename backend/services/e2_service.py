@@ -1,22 +1,23 @@
 """
-gemini_service.py — Async Gemini service for product condition grading based on text only.
+e2_service.py — AI service for product condition grading using Groq (Llama 3).
 """
 
 import json
-import google.generativeai as genai
-from typing import Dict, Any
-
+from groq import AsyncGroq
 from models.schemas import ConditionRequest, ConditionResponse
 from utils.constants import GEMINI_SYSTEM_PROMPT
 from config import settings
 from utils.validators import extract_json_block
 
-# Configure Gemini with the API Key
-genai.configure(api_key=settings.GEMINI_API_KEY)
+# Initialize Async Groq client
+# Fallback to a placeholder if key is missing to avoid startup crash
+_client = None
+if settings.GROQ_API_KEY:
+    _client = AsyncGroq(api_key=settings.GROQ_API_KEY)
 
 def _build_user_message(request: ConditionRequest) -> str:
     """
-    Constructs the text payload for Gemini based on the rich ProductPassport and grading rubric.
+    Constructs the text payload for Llama-3 based on the rich ProductPassport and grading rubric.
     """
     passport = request.passport
     
@@ -32,6 +33,7 @@ def _build_user_message(request: ConditionRequest) -> str:
     # Grading Rubric
     rubric_str = "Standard evaluation"
     if request.grading_rubric:
+        # Pydantic dict handles the conversion
         rubric_str = "\n".join([f"- {k}: {v}" for k, v in request.grading_rubric.items()])
 
     return (
@@ -50,36 +52,38 @@ def _build_user_message(request: ConditionRequest) -> str:
         f"- Known Issues: {passport.known_issues or 'None reported'}\n"
         f"- Ownership: {ownership_str}\n\n"
         f"Grading Rubric to follow:\n{rubric_str}\n\n"
-        "Analyze the product details above against the rubric and return the JSON report."
+        "Analyze the product details above against the rubric and return the JSON report strictly formatted."
     )
 
-async def generate_condition_report_gemini(request: ConditionRequest) -> ConditionResponse:
+async def generate_condition_report_e2(request: ConditionRequest) -> ConditionResponse:
     """
-    Calls Google Gemini with the product passport text and returns a
+    Calls Groq (Llama-3) with the product passport text and returns a
     validated ConditionResponse Pydantic model.
     """
-    # Use gemini-flash-latest for fast and free text-based analysis
-    model = genai.GenerativeModel(
-        model_name="gemini-flash-latest",
-        system_instruction=GEMINI_SYSTEM_PROMPT,
-        generation_config=genai.GenerationConfig(
-            temperature=0.2, # Low temperature for more deterministic output
-            response_mime_type="application/json", # Highly reliable JSON mode
-        )
-    )
+    if not _client:
+        raise RuntimeError("GROQ_API_KEY is not configured in .env")
 
     user_prompt = _build_user_message(request)
     
-    # Generate the response
-    response = await model.generate_content_async(user_prompt)
+    # Generate the response using Llama 3.1 8B for high speed and lower limits
+    # We use json_mode for structured output reliability
+    completion = await _client.chat.completions.create(
+        model="llama-3.1-8b-instant",
+        messages=[
+            {"role": "system", "content": GEMINI_SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt}
+        ],
+        temperature=0.2,
+        max_tokens=1024,
+        response_format={"type": "json_object"}
+    )
     
-    # Extract the JSON mapping
-    raw_text = response.text
-    parsed_dict = extract_json_block(raw_text)
+    raw_text = completion.choices[0].message.content
+    parsed_dict = json.loads(raw_text)
 
-    # Calculate ws_approved: false if score is between 0-20, true otherwise
+    # Calculate ws_approved logic matching previous implementation
     score = parsed_dict.get("score", 0)
     parsed_dict["ws_approved"] = score > 20
 
-    # Validate the dictionary against our schema -> ensures keys are present
+    # Validate against our schema
     return ConditionResponse(**parsed_dict)
