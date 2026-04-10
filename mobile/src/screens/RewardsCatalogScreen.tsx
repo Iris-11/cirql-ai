@@ -19,13 +19,15 @@ import { Card } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import { useRewardsData, useRedeemReward } from "../hooks/useRewards";
+import { useUserProfile } from "../hooks/useImpact";
 import type { Reward } from "../types";
 
 export function RewardsCatalogScreen() {
   const { data: rewards, isLoading } = useRewardsData();
+  const { data: profile, isLoading: profileLoading } = useUserProfile();
   const redeemMutation = useRedeemReward();
 
-  if (isLoading || !rewards) {
+  if (isLoading || !rewards || profileLoading) {
     return (
       <SafeAreaView className="flex-1 bg-surface items-center justify-center">
         <ActivityIndicator size="large" color="#1F6F54" />
@@ -55,13 +57,22 @@ export function RewardsCatalogScreen() {
               className="p-7"
             >
               <Text className="text-sm text-white/70 font-medium">
-                Your Balance
+                Reward Points
               </Text>
               <View className="flex-row items-baseline gap-2 mt-1">
                 <Text className="text-5xl font-bold text-white">
-                  {rewards.pointBalance.toLocaleString()}
+                  {(profile?.reward_points ?? 0).toLocaleString()}
                 </Text>
                 <Text className="text-lg text-white/70 font-medium">pts</Text>
+              </View>
+              <View className="mt-4 h-px bg-white/20" />
+              <View className="flex-row items-center justify-between mt-4">
+                <Text className="text-sm text-white/70 font-medium">
+                  Store Credit
+                </Text>
+                <Text className="text-xl font-bold text-white">
+                  ${(profile?.store_credit_usd ?? 0).toFixed(2)}
+                </Text>
               </View>
             </LinearGradient>
           </Card>
@@ -109,7 +120,7 @@ export function RewardsCatalogScreen() {
               <RewardCard
                 key={reward.id}
                 reward={reward}
-                canAfford={rewards.pointBalance >= reward.pointsCost}
+                canAfford={(profile?.reward_points ?? 0) >= reward.pointsCost}
                 onRedeem={() => redeemMutation.mutate(reward.id)}
                 isRedeeming={redeemMutation.isPending}
               />

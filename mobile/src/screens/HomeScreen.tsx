@@ -16,7 +16,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { LinearGradient } from "expo-linear-gradient";
-import { ArrowRight, Leaf, ShieldCheck, Scan } from "lucide-react-native";
+import { ArrowRight, Leaf, ShieldCheck, Scan, ShoppingBag } from "lucide-react-native";
 
 import { Card } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
@@ -34,8 +34,8 @@ function formatNumber(n: number): string {
 
 export function HomeScreen() {
   const navigation = useNavigation<Nav>();
-  const { data: stats, isLoading: statsLoading, refetch } = useCommunityStats();
-  const { data: rehomes, isLoading: rehomesLoading } = useCommunityRehomes();
+  const { data: stats, refetch } = useCommunityStats();
+  const { data: rehomes } = useCommunityRehomes();
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = async () => {
@@ -86,7 +86,7 @@ export function HomeScreen() {
                 of CO₂ emissions
               </Text>
 
-              {/* Live Metrics */}
+              {/* Live Metrics — Row 1 */}
               <View className="flex-row mt-6 gap-6">
                 <View>
                   <Text className="text-2xl font-bold text-white">
@@ -102,6 +102,34 @@ export function HomeScreen() {
                   </Text>
                   <Text className="text-xs text-white/60 mt-0.5">
                     Active Members
+                  </Text>
+                </View>
+                <View>
+                  <Text className="text-2xl font-bold text-white">
+                    {stats ? formatNumber(stats.resalesThisYear) : "..."}
+                  </Text>
+                  <Text className="text-xs text-white/60 mt-0.5">
+                    Resales This Year
+                  </Text>
+                </View>
+              </View>
+
+              {/* Live Metrics — Row 2 */}
+              <View className="flex-row mt-4 gap-6">
+                <View>
+                  <Text className="text-2xl font-bold text-white">
+                    {stats ? formatNumber(stats.totalLandfillDivertedKg) : "..."} kg
+                  </Text>
+                  <Text className="text-xs text-white/60 mt-0.5">
+                    Landfill Diverted
+                  </Text>
+                </View>
+                <View>
+                  <Text className="text-2xl font-bold text-white">
+                    {stats ? formatNumber(stats.totalDonatedRecycled) : "..."}
+                  </Text>
+                  <Text className="text-xs text-white/60 mt-0.5">
+                    Donated / Recycled
                   </Text>
                 </View>
               </View>
@@ -171,6 +199,25 @@ export function HomeScreen() {
               className="mt-5"
             />
           </Card>
+        </View>
+
+        {/* ── Marketplace CTA ── */}
+        <View className="px-6 mt-5">
+          <TouchableOpacity onPress={() => navigation.navigate("Marketplace")} activeOpacity={0.8}>
+            <Card variant="elevated" className="flex-row items-center justify-between">
+              <View className="flex-1">
+                <Text className="text-lg font-bold text-on-surface">
+                  Shop Pre-Owned
+                </Text>
+                <Text className="text-sm text-outline mt-1">
+                  Browse AI-verified heritage products from other members.
+                </Text>
+              </View>
+              <View className="bg-primary rounded-full p-2 ml-3">
+                <ShoppingBag size={18} color="#ffffff" />
+              </View>
+            </Card>
+          </TouchableOpacity>
         </View>
 
         {/* ── Newsletter ── */}

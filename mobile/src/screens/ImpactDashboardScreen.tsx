@@ -13,36 +13,52 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
-import { TreePine, Package, ShoppingBag, Recycle, Zap } from "lucide-react-native";
+import { TreePine, Package, ShoppingBag, Trash2 } from "lucide-react-native";
 
 import { Card } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
 import { CircularProgress } from "../components/ui/CircularProgress";
 import { ProductCard } from "../components/product/ProductCard";
-import { useUserImpact, usePortfolio } from "../hooks/useImpact";
-import type { RootStackParamList } from "../types";
+import { useUserImpact, usePurchaseHistory } from "../hooks/useImpact";
+import type { RootStackParamList, PurchaseHistoryItem, PortfolioProduct } from "../types";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
+
+/** Map a history item to the shape ProductCard expects */
+function toPortfolioProduct(item: PurchaseHistoryItem): PortfolioProduct {
+  return {
+    id: item.passport_id,
+    name: item.product_name,
+    brand: item.brand || item.sku_code,
+    category: item.category,
+    image: item.image_url ?? "",
+    sustainabilityScore: item.sustainability_score,
+    status: "tracked",
+    addedDate: item.purchase_date,
+  };
+}
 
 export function ImpactDashboardScreen() {
   const navigation = useNavigation<Nav>();
   const { data: impact, isLoading: impactLoading, refetch } = useUserImpact();
-  const { data: portfolio, isLoading: portfolioLoading } = usePortfolio();
+  const { data: history, isLoading: historyLoading, refetch: refetchHistory } = usePurchaseHistory();
 
   const [refreshing, setRefreshing] = React.useState(false);
   const onRefresh = async () => {
     setRefreshing(true);
-    await refetch();
+    await Promise.all([refetch(), refetchHistory()]);
     setRefreshing(false);
   };
 
-  if (impactLoading || portfolioLoading) {
+  if (impactLoading || historyLoading) {
     return (
       <SafeAreaView className="flex-1 bg-surface items-center justify-center">
         <ActivityIndicator size="large" color="#1F6F54" />
       </SafeAreaView>
     );
   }
+
+  const portfolio = (history ?? []).map(toPortfolioProduct);
 
   return (
     <SafeAreaView className="flex-1 bg-surface" edges={["top"]}>
@@ -82,30 +98,38 @@ export function ImpactDashboardScreen() {
           </Card>
         </View>
 
-        {/* CO2 Card */}
-        <View className="px-6 mt-4">
-          <Card variant="cream">
-            <View className="flex-row items-center gap-3">
-              <View className="bg-secondary-fixed rounded-2xl p-3">
-                <TreePine size={24} color="#1F6F54" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-2xl font-bold text-on-surface">
-                  {impact?.co2SavedKg ?? 0} kg CO₂
-                </Text>
-                <Text className="text-sm text-outline mt-0.5">
-                  Equivalent to planting{" "}
-                  <Text className="font-bold text-primary">
-                    {impact?.treesEquivalent ?? 0} young trees
-                  </Text>
-                </Text>
-              </View>
+        {/* CO2 + Landfill Cards */}
+        <View className="px-6 mt-4 flex-row gap-3">
+          <Card variant="cream" className="flex-1">
+            <View className="bg-secondary-fixed rounded-2xl p-3 self-start mb-3">
+              <TreePine size={20} color="#1F6F54" />
             </View>
+            <Text className="text-xl font-bold text-on-surface">
+              {impact?.co2SavedKg ?? 0} kg
+            </Text>
+            <Text className="text-xs text-outline mt-0.5 font-medium">
+              CO₂ Avoided
+            </Text>
+            <Text className="text-xs text-primary font-semibold mt-1">
+              ≈ {impact?.treesEquivalent ?? 0} trees
+            </Text>
+          </Card>
+
+          <Card variant="cream" className="flex-1">
+            <View className="bg-secondary-fixed rounded-2xl p-3 self-start mb-3">
+              <Trash2 size={20} color="#1F6F54" />
+            </View>
+            <Text className="text-xl font-bold text-on-surface">
+              {impact?.landfillAvoidedKg ?? 0} kg
+            </Text>
+            <Text className="text-xs text-outline mt-0.5 font-medium">
+              Landfill Avoided
+            </Text>
           </Card>
         </View>
 
         {/* Metrics Grid */}
-        <View className="px-6 mt-4 flex-row flex-wrap gap-3">
+        <View className="px-6 mt-4 flex-row gap-3">
           <MetricCard
             icon={<Package size={18} color="#1F6F54" />}
             value={impact?.trackedItems ?? 0}
@@ -116,27 +140,22 @@ export function ImpactDashboardScreen() {
             value={impact?.resoldItems ?? 0}
             label="Resold"
           />
-          <MetricCard
-            icon={<Recycle size={18} color="#1F6F54" />}
-            value={impact?.recycledItems ?? 0}
-            label="Recycled"
-          />
-          <MetricCard
-            icon={<Zap size={18} color="#1F6F54" />}
-            value={impact?.impactPoints ?? 0}
-            label="Points"
-          />
         </View>
 
-        {/* Product Portfolio */}
+        {/* Product Portfolio — from history API */}
         <View className="mt-8">
           <View className="px-6 mb-4">
             <Text className="text-xl font-bold text-on-surface">
               Product Portfolio
             </Text>
+            {portfolio.length === 0 && (
+              <Text className="text-sm text-outline mt-1">
+                No products tracked yet.
+              </Text>
+            )}
           </View>
           <View className="px-6">
-            {(portfolio ?? []).map((product) => (
+            {portfolio.map((product) => (
               <ProductCard
                 key={product.id}
                 product={product}
@@ -169,13 +188,12 @@ function MetricCard({
     <Card
       variant="elevated"
       className="flex-1 items-center py-4 px-3"
-      style={{ minWidth: "45%" }}
     >
       <View className="bg-surface-container-low rounded-full p-2 mb-2">
         {icon}
       </View>
       <Text className="text-xl font-bold text-on-surface">{value}</Text>
-      <Text className="text-xs text-outline mt-0.5 font-medium">{label}</Text>
+      <Text className="text-xs text-outline mt-0.5 font-medium text-center">{label}</Text>
     </Card>
   );
 }

@@ -1,5 +1,5 @@
 /**
- * RecycleScreen — Browse all recycling partners and select one.
+ * DonateScreen — Browse all donation partners and select one.
  * Guides the user to visit or contact the partner to arrange drop-off.
  */
 
@@ -19,7 +19,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import type { RouteProp } from "@react-navigation/native";
 import {
   ArrowLeft,
-  Recycle,
+  Heart,
   MapPin,
   CheckCircle,
   Tag,
@@ -36,27 +36,27 @@ import { confirmAction } from "../api/services/productService";
 import type { RootStackParamList, Partner } from "../types";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
-type Route = RouteProp<RootStackParamList, "RecycleProduct">;
+type Route = RouteProp<RootStackParamList, "DonateProduct">;
 
 const HOW_IT_WORKS = [
   {
     step: "1",
     title: "Pick a Partner",
-    desc: "Choose a certified recycling partner that accepts your product category.",
+    desc: "Choose a donation partner that accepts your product category.",
   },
   {
     step: "2",
     title: "Contact or Visit",
-    desc: "Call ahead or drop off your item directly at the partner's facility.",
+    desc: "Call ahead or walk in to your nearest partner location to arrange a drop-off.",
   },
   {
     step: "3",
     title: "Confirm in App",
-    desc: "Tap Confirm below so CIRQL can record your recycling and award impact points.",
+    desc: "Tap Confirm below so CIRQL can record your donation and award impact points.",
   },
 ];
 
-export function RecycleScreen() {
+export function DonateScreen() {
   const navigation = useNavigation<Nav>();
   const route = useRoute<Route>();
   const { listingId } = route.params;
@@ -65,13 +65,13 @@ export function RecycleScreen() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
 
-  const recyclePartners = partners?.recycle ?? [];
+  const donatePartners = partners?.donate ?? [];
 
   const handleConfirm = async () => {
     if (!selectedId) return;
     setConfirming(true);
     try {
-      await confirmAction(listingId, "recycle");
+      await confirmAction(listingId, "donate");
       navigation.popToTop();
     } catch {
       Alert.alert("Error", "Could not confirm. Please try again.");
@@ -88,9 +88,9 @@ export function RecycleScreen() {
           <ArrowLeft size={24} color="#191c1d" />
         </TouchableOpacity>
         <View className="flex-1">
-          <Text className="text-lg font-bold text-on-surface">Recycle Product</Text>
+          <Text className="text-lg font-bold text-on-surface">Donate Product</Text>
           <Text className="text-xs text-outline mt-0.5">
-            Close the loop responsibly
+            Give your item a meaningful second life
           </Text>
         </View>
       </View>
@@ -134,26 +134,26 @@ export function RecycleScreen() {
           <View className="mt-4 flex-row items-start gap-2 bg-secondary-fixed rounded-2xl px-4 py-3">
             <Info size={14} color="#1F6F54" />
             <Text className="flex-1 text-xs text-primary leading-4 font-medium">
-              You can visit any partner facility directly or call ahead to confirm they can receive your item before making the trip.
+              You can visit any partner location directly or call ahead to confirm they can receive your item before making the trip.
             </Text>
           </View>
 
           {/* Partner List */}
           <View className="flex-row items-center justify-between mt-6 mb-3">
             <Text className="text-base font-bold text-on-surface">
-              Recycling Partners
+              Donation Partners
             </Text>
-            <Badge label={`${recyclePartners.length} available`} variant="verified" />
+            <Badge label={`${donatePartners.length} available`} variant="verified" />
           </View>
 
-          {recyclePartners.length === 0 ? (
+          {donatePartners.length === 0 ? (
             <Card variant="flat" className="items-center py-8">
               <Text className="text-sm text-outline">
-                No recycling partners available right now.
+                No donation partners available right now.
               </Text>
             </Card>
           ) : (
-            recyclePartners.map((partner) => (
+            donatePartners.map((partner) => (
               <PartnerCard
                 key={partner.id}
                 partner={partner}
@@ -161,7 +161,8 @@ export function RecycleScreen() {
                 onSelect={() =>
                   setSelectedId(selectedId === partner.id ? null : partner.id)
                 }
-                icon={<Recycle size={20} color="#1F6F54" />}
+                icon={<Heart size={20} color="#1F6F54" />}
+                actionVerb="donate to"
               />
             ))
           )}
@@ -175,7 +176,7 @@ export function RecycleScreen() {
               </View>
             ) : (
               <Button
-                title={selectedId ? "Confirm — I've Arranged Recycling" : "Select a Partner Above"}
+                title={selectedId ? "Confirm — I've Arranged My Donation" : "Select a Partner Above"}
                 onPress={handleConfirm}
                 disabled={!selectedId}
                 size="lg"
@@ -200,12 +201,14 @@ function PartnerCard({
   selected,
   onSelect,
   icon,
+  actionVerb,
 }: {
   partner: Partner;
   selected: boolean;
   onSelect: () => void;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   icon: any;
+  actionVerb: string;
   key?: string;
 }) {
   return (
@@ -261,7 +264,7 @@ function PartnerCard({
           </View>
         </View>
 
-        {/* Divider + Visit / Contact hints */}
+        {/* Divider + Contact / Directions hint */}
         <View className="mt-4 pt-3 border-t border-surface-container-high flex-row gap-3">
           <View className="flex-1 flex-row items-center gap-2 bg-surface-container-low rounded-xl px-3 py-2">
             <Navigation size={13} color="#1F6F54" />
@@ -280,7 +283,7 @@ function PartnerCard({
         {selected && (
           <View className="mt-3 bg-secondary-fixed rounded-xl px-3 py-2">
             <Text className="text-xs text-primary font-medium text-center leading-4">
-              Great choice! Contact or visit {partner.name} to drop off your item, then confirm below.
+              Great choice! Contact or visit {partner.name} to {actionVerb} your item, then confirm below.
             </Text>
           </View>
         )}

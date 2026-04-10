@@ -113,15 +113,38 @@ export type FullAssessmentResult = FullPipelineResult;
 // Impact Dashboard
 // ────────────────────────────────────────────────
 
+export interface UserProfile {
+  id?: string;
+  name?: string;
+  city?: string;
+  email: string;
+  store_credit_usd: number;
+  reward_points: number;
+  green_badges: number;
+  is_secondary_buyer: boolean;
+}
+
 export interface UserImpact {
   circularScore: number;
   heritageTier: string;
   co2SavedKg: number;
-  treesEquivalent: number;
+  treesEquivalent: number;   // derived: floor(co2SavedKg / 21)
+  landfillAvoidedKg: number;
   trackedItems: number;
   resoldItems: number;
-  recycledItems: number;
-  impactPoints: number;
+}
+
+export interface PurchaseHistoryItem {
+  passport_id: string;
+  product_name: string;
+  sku_code: string;
+  category: string;
+  brand: string;
+  event_type: string;
+  purchase_date: string;
+  retail_price_usd: number;
+  sustainability_score: number;
+  image_url?: string;
 }
 
 export interface PortfolioProduct {
@@ -175,8 +198,11 @@ export interface CommunityRehome {
 
 export interface CommunityStats {
   totalCo2SavedKg: number;
+  totalLandfillDivertedKg: number;
   totalItemsRehomed: number;
+  resalesThisYear: number;
   totalMembersActive: number;
+  totalDonatedRecycled: number;
 }
 
 // ────────────────────────────────────────────────
@@ -220,6 +246,37 @@ export interface SelectedProduct {
   condition_tier: string | null;
 }
 
+export interface Partner {
+  id: string;
+  name: string;
+  type: string;
+  accepted_categories: string[];
+  min_condition_tier?: string | null;
+  regions: string[];
+  active: boolean;
+}
+
+export interface CategorizedPartners {
+  donate: Partner[];
+  recycle: Partner[];
+}
+
+export interface MarketplaceProduct {
+  id: string;
+  name: string;
+  brand: string;
+  category: string;
+  image: string;
+  price: number;
+  originalPrice: number;
+  conditionTier: string;
+  conditionScore: number;
+  authenticityScore: number;
+  ownerCount: number;
+  co2SavedKg: number;
+  reportText: string;
+}
+
 export type RootStackParamList = {
   Login: undefined;
   MainTabs: undefined;
@@ -228,8 +285,13 @@ export type RootStackParamList = {
   VerifyProduct: { product: SelectedProduct };
   VerificationPending: { productId: string };
   VerificationResult: { result: FullPipelineResult } | { productId: string };
-  RecycleProduct: { productId: string };
+  ResaleListed: { listingId: string; suggestedPrice: number; conditionTier: string };
+  DonateProduct: { listingId: string };
+  RecycleProduct: { listingId: string };
   Confirmation: { confirmationData: ConfirmationData };
+  Marketplace: undefined;
+  MarketplaceProductDetail: { product: MarketplaceProduct };
+  BuyerOrderConfirm: { product: MarketplaceProduct };
 };
 
 export type TabParamList = {

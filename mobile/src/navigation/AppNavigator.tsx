@@ -6,7 +6,7 @@ import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { View, Text, ActivityIndicator } from "react-native";
+import { View, ActivityIndicator } from "react-native";
 import { useAuth } from "../context/AuthContext";
 import { Home, Gift, User, TrendingUp } from "lucide-react-native";
 
@@ -21,6 +21,12 @@ import { VerificationResultScreen } from "../screens/VerificationResultScreen";
 import { RecycleScreen } from "../screens/RecycleScreen";
 import { RewardsCatalogScreen } from "../screens/RewardsCatalogScreen";
 import { ConfirmationScreen } from "../screens/ConfirmationScreen";
+import { ProfileScreen } from "../screens/ProfileScreen";
+import { DonateScreen } from "../screens/DonateScreen";
+import { ResaleListedScreen } from "../screens/ResaleListedScreen";
+import { MarketplaceScreen } from "../screens/MarketplaceScreen";
+import { MarketplaceProductDetailScreen } from "../screens/MarketplaceProductDetailScreen";
+import { BuyerOrderConfirmScreen } from "../screens/BuyerOrderConfirmScreen";
 
 import type { RootStackParamList, TabParamList } from "../types";
 
@@ -102,7 +108,7 @@ function TabNavigator() {
       />
       <Tab.Screen
         name="Profile"
-        component={ProfilePlaceholder}
+        component={ProfileScreen}
         options={{
           tabBarIcon: ({ color, focused }) => (
             <View className="items-center">
@@ -115,14 +121,6 @@ function TabNavigator() {
         }}
       />
     </Tab.Navigator>
-  );
-}
-
-function ProfilePlaceholder() {
-  return (
-    <View className="flex-1 items-center justify-center bg-surface">
-      <Text className="text-lg text-outline">Profile — Coming Soon</Text>
-    </View>
   );
 }
 
@@ -158,7 +156,12 @@ export function AppNavigator() {
             <Stack.Screen name="VerifyProduct" component={VerifyProductScreen} />
             <Stack.Screen name="VerificationPending" component={VerificationPendingScreen} />
             <Stack.Screen name="VerificationResult" component={VerificationResultScreen} />
+            <Stack.Screen name="ResaleListed" component={ResaleListedScreen} />
+            <Stack.Screen name="DonateProduct" component={DonateScreen} />
             <Stack.Screen name="RecycleProduct" component={RecycleScreen} />
+            <Stack.Screen name="Marketplace" component={MarketplaceScreen} />
+            <Stack.Screen name="MarketplaceProductDetail" component={MarketplaceProductDetailScreen} />
+            <Stack.Screen name="BuyerOrderConfirm" component={BuyerOrderConfirmScreen} />
             <Stack.Screen name="Confirmation" component={ConfirmationScreen} />
           </>
         ) : (

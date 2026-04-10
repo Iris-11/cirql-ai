@@ -55,7 +55,6 @@ export function VerificationResultScreen() {
   const result: FullPipelineResult | null = params?.result ?? null;
   const [selectedAction, setSelectedAction] = useState<Action | null>(null);
   const [confirming, setConfirming] = useState(false);
-  const [confirmed, setConfirmed] = useState(false);
 
   if (!result) {
     return (
@@ -116,58 +115,21 @@ export function VerificationResultScreen() {
     RESALE_TIERS.includes((e2_result.tier ?? "").toLowerCase());
 
   const handleConfirm = async () => {
-    if (!selectedAction) return;
+    if (selectedAction !== "resale") return;
     setConfirming(true);
     try {
-      await confirmAction(result.listing_id, selectedAction);
-      setConfirmed(true);
+      await confirmAction(result.listing_id, "resale");
+      navigation.replace("ResaleListed", {
+        listingId: result.listing_id,
+        suggestedPrice: e2_result.suggested_price ?? 0,
+        conditionTier: e2_result.tier,
+      });
     } catch {
       Alert.alert("Error", "Could not confirm your selection. Please try again.");
     } finally {
       setConfirming(false);
     }
   };
-
-  // ── Post-confirmation success view ────────────────────────────────────────
-  if (confirmed && selectedAction) {
-    const labels: Record<Action, string> = {
-      resale: "Listed for Resale",
-      donate: "Scheduled for Donation",
-      recycle: "Scheduled for Recycling",
-    };
-    const messages: Record<Action, string> = {
-      resale: "Your item has been listed. You'll be notified when a buyer is matched.",
-      donate: "Thank you! Your item will be donated to a partner in need.",
-      recycle: "Your item will be responsibly recycled through our partner network.",
-    };
-    const action = selectedAction as Action;
-    return (
-      <SafeAreaView className="flex-1 bg-surface items-center justify-center px-8" edges={["top"]}>
-        <View className="bg-secondary-fixed rounded-full p-6 mb-6">
-          <CheckCircle size={40} color="#1F6F54" />
-        </View>
-        <Text className="text-2xl font-bold text-on-surface text-center">{labels[action]}</Text>
-        <Text className="text-sm text-outline text-center mt-3 leading-5">
-          {messages[action]}
-        </Text>
-        {e3_result && (
-          <Card variant="cream" className="mt-6 w-full">
-            <Text className="text-xs font-semibold text-outline mb-1">Partner</Text>
-            <Text className="text-sm font-bold text-on-surface">{e3_result.partner}</Text>
-            <View className="flex-row gap-4 mt-3">
-              <Text className="text-xs text-outline">
-                🌿 {e3_result.impact.co2_avoided_kg}kg CO₂ avoided
-              </Text>
-              <Text className="text-xs text-outline">
-                ♻️ {e3_result.impact.landfill_diverted_kg}kg diverted
-              </Text>
-            </View>
-          </Card>
-        )}
-        <Button title="Go Home" onPress={() => navigation.popToTop()} className="mt-8" size="lg" />
-      </SafeAreaView>
-    );
-  }
 
   // ── Full result ───────────────────────────────────────────────────────────
   return (
@@ -391,13 +353,11 @@ export function VerificationResultScreen() {
           </TouchableOpacity>
 
           {/* Donate */}
-          <TouchableOpacity onPress={() => setSelectedAction("donate")} activeOpacity={0.7}>
-            <View
-              className={`rounded-2xl border-2 p-4 mb-3 flex-row items-center gap-4 ${selectedAction === "donate"
-                  ? "border-primary bg-secondary-fixed"
-                  : "border-surface-container-high bg-surface-container"
-                }`}
-            >
+          <TouchableOpacity
+            onPress={() => navigation.navigate("DonateProduct", { listingId: result.listing_id })}
+            activeOpacity={0.7}
+          >
+            <View className="rounded-2xl border-2 border-surface-container-high bg-surface-container p-4 mb-3 flex-row items-center gap-4">
               <View className="bg-white rounded-full p-2">
                 <Heart size={20} color="#1F6F54" />
               </View>
@@ -407,20 +367,16 @@ export function VerificationResultScreen() {
                   Give to a charity or community partner
                 </Text>
               </View>
-              {selectedAction === "donate" && (
-                <CheckCircle size={20} color="#1F6F54" />
-              )}
+              <CheckCircle size={20} color="#c8d8c8" />
             </View>
           </TouchableOpacity>
 
           {/* Recycle */}
-          <TouchableOpacity onPress={() => setSelectedAction("recycle")} activeOpacity={0.7}>
-            <View
-              className={`rounded-2xl border-2 p-4 mb-3 flex-row items-center gap-4 ${selectedAction === "recycle"
-                  ? "border-primary bg-secondary-fixed"
-                  : "border-surface-container-high bg-surface-container"
-                }`}
-            >
+          <TouchableOpacity
+            onPress={() => navigation.navigate("RecycleProduct", { listingId: result.listing_id })}
+            activeOpacity={0.7}
+          >
+            <View className="rounded-2xl border-2 border-surface-container-high bg-surface-container p-4 mb-3 flex-row items-center gap-4">
               <View className="bg-white rounded-full p-2">
                 <RefreshCw size={20} color="#1F6F54" />
               </View>
@@ -430,15 +386,13 @@ export function VerificationResultScreen() {
                   Responsibly recycled through our partner network
                 </Text>
               </View>
-              {selectedAction === "recycle" && (
-                <CheckCircle size={20} color="#1F6F54" />
-              )}
+              <CheckCircle size={20} color="#c8d8c8" />
             </View>
           </TouchableOpacity>
         </View>}
 
-        {/* ── Confirm Button (only if SKU matched) ── */}
-        {e1_result.sku_match && <View className="px-6 mt-4 mb-4">
+        {/* ── Confirm Button — resale only ── */}
+        {e1_result.sku_match && resaleEnabled && <View className="px-6 mt-4 mb-4">
           {confirming ? (
             <View className="items-center py-4">
               <ActivityIndicator color="#1F6F54" />
@@ -446,9 +400,9 @@ export function VerificationResultScreen() {
             </View>
           ) : (
             <Button
-              title={selectedAction ? `Confirm — ${selectedAction.charAt(0).toUpperCase() + selectedAction.slice(1)}` : "Select an option above"}
+              title={selectedAction === "resale" ? "Confirm — List for Resale" : "Select an option above"}
               onPress={handleConfirm}
-              disabled={!selectedAction}
+              disabled={selectedAction !== "resale"}
               size="lg"
             />
           )}
