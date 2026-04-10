@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  ShieldCheck, 
-  AlertTriangle, 
-  Info, 
-  CheckCircle2, 
-  XCircle, 
-  User, 
-  MapPin, 
+import {
+  ShieldCheck,
+  AlertTriangle,
+  Info,
+  CheckCircle2,
+  XCircle,
+  User,
+  MapPin,
   Mail,
   Camera,
   Image as ImageIcon,
@@ -46,7 +46,7 @@ const Approvals = () => {
         method: 'PATCH',
       });
       if (!response.ok) throw new Error(`Failed to ${action} listing`);
-      
+
       // Remove from list
       setListings(prev => prev.filter(item => item.id !== id));
     } catch (err) {
@@ -99,7 +99,7 @@ const Approvals = () => {
           <p>There are no listings pending approval at this time.</p>
         </div>
       ) : (
-        <motion.div 
+        <motion.div
           className="approvals-grid"
           variants={containerVariants}
           initial="hidden"
@@ -107,9 +107,9 @@ const Approvals = () => {
         >
           <AnimatePresence>
             {listings.map(listing => (
-              <ApprovalCard 
-                key={listing.id} 
-                listing={listing} 
+              <ApprovalCard
+                key={listing.id}
+                listing={listing}
                 severity={getSeverity(listing.e1_result)}
                 onAction={handleAction}
                 isProcessing={processingId === listing.id}
@@ -199,8 +199,11 @@ const ApprovalCard = ({ listing, severity, onAction, isProcessing }) => {
 
   const config = severityConfig[severity];
 
+  const isSkuMismatch =
+    e1_result?.flags?.includes('sku_mismatch') || e1_result?.sku_match === false;
+
   return (
-    <motion.div 
+    <motion.div
       layout
       variants={{ hidden: { opacity: 0, scale: 0.95 }, visible: { opacity: 1, scale: 1 } }}
       exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.2 } }}
@@ -302,7 +305,13 @@ const ApprovalCard = ({ listing, severity, onAction, isProcessing }) => {
             <p className="report-text">{e2_result?.report_text}</p>
             <div className="price-tag">
               <label>Suggested Price</label>
-              <div className="val">{e2_result?.suggested_price ? `$${e2_result.suggested_price}` : 'N/A'}</div>
+              <div className="val">
+                {isSkuMismatch
+                  ? '$0'
+                  : e2_result?.suggested_price
+                    ? `$${e2_result.suggested_price}`
+                    : 'N/A'}
+              </div>
             </div>
           </div>
 
@@ -327,14 +336,14 @@ const ApprovalCard = ({ listing, severity, onAction, isProcessing }) => {
 
         {/* Footer Actions */}
         <div className="card-footer">
-          <button 
+          <button
             className="btn btn-reject"
             onClick={() => onAction(listing.id, 'reject')}
             disabled={isProcessing}
           >
             {isProcessing ? 'Processing' : 'Reject Listing'}
           </button>
-          <button 
+          <button
             className="btn btn-approve"
             onClick={() => onAction(listing.id, 'approve')}
             disabled={isProcessing}
