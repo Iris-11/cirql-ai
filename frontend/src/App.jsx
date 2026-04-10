@@ -4,6 +4,8 @@ import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';
 import Approvals from './pages/Approvals';
 import Products from './pages/Products';
+import Passports from './pages/Passports';
+import Resale from './pages/Resale';
 
 function App() {
   return (
@@ -13,6 +15,8 @@ function App() {
           <Route path="/" element={<Dashboard />} />
           <Route path="/approvals" element={<Approvals />} />
           <Route path="/products" element={<Products />} />
+          <Route path="/passports" element={<Passports />} />
+          <Route path="/resale" element={<Resale />} />
           {/* Add more routes as the portal grows */}
           <Route path="*" element={<Dashboard />} /> 
         </Routes>

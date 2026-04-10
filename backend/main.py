@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.routes import dashboard, listings, products
+from backend.routes import dashboard, listings, products, passports, resale
 
 app = FastAPI(title="CIRQL Brand Portal API")
 
@@ -17,6 +17,8 @@ app.add_middleware(
 app.include_router(dashboard.router, prefix="/api")
 app.include_router(listings.router)
 app.include_router(products.router)
+app.include_router(passports.router)
+app.include_router(resale.router)
 
 @app.get("/")
 async def root():

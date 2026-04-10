@@ -1,13 +1,13 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  Shirt, 
-  FileText, 
-  Repeat, 
-  Recycle, 
-  Users, 
-  BarChart3, 
+import {
+  LayoutDashboard,
+  Shirt,
+  FileText,
+  Repeat,
+  Recycle,
+  Users,
+  BarChart3,
   Settings,
   Circle,
   ShieldCheck
@@ -21,7 +21,6 @@ const Sidebar = () => {
     { name: 'Passports', icon: FileText, path: '/passports' },
     { name: 'Resale', icon: Repeat, path: '/resale' },
     { name: 'Recycling', icon: Recycle, path: '/recycling' },
-    { name: 'Customers', icon: Users, path: '/customers' },
     { name: 'ESG Reports', icon: BarChart3, path: '/reports' },
     { name: 'Settings', icon: Settings, path: '/settings' },
   ];
@@ -47,7 +46,7 @@ const Sidebar = () => {
 
       <nav className="sidebar-nav">
         {menuItems.map((item) => (
-          <NavLink 
+          <NavLink
             key={item.name}
             to={item.path}
             className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}

@@ -1,8 +1,10 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Always resolve .env relative to this file's directory (backend/)
+_env_path = Path(__file__).parent / '.env'
+load_dotenv(dotenv_path=_env_path)
 
 SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")

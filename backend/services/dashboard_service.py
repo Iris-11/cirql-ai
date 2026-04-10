@@ -107,22 +107,20 @@ def get_dashboard_metrics(selected_year: int = None) -> Dict[str, Any]:
             "percentage": round((count / total_p) * 100)
         })
 
-    # 5. Lifecycle Data
+    # 5. Lifecycle Data (max 2 owners per policy)
     lifecycle_data = [
         {"stage": "Active (1st owner)", "count": 0, "color": "var(--color-brand-accent)"},
         {"stage": "2nd life (resold)", "count": 0, "color": "#64748B"},
-        {"stage": "3rd+ life", "count": 0, "color": "#94A3B8"},
         {"stage": "Recycled", "count": 0, "color": "#CBD5E1"}
     ]
-    lifecycle_res = supabase.table('passports').select('status, ownership_count').execute()
+    lifecycle_res = supabase.table('passports').select('status, ownership_count').lte('ownership_count', 2).execute()
     for item in lifecycle_res.data:
         if item['status'] == 'recycled':
-            lifecycle_data[3]["count"] += 1
+            lifecycle_data[2]["count"] += 1
         else:
             occ = item['ownership_count'] or 1
             if occ == 1: lifecycle_data[0]["count"] += 1
-            elif occ == 2: lifecycle_data[1]["count"] += 1
-            else: lifecycle_data[2]["count"] += 1
+            else: lifecycle_data[1]["count"] += 1
 
     # 6. Reward Activity
     reward_points_res = supabase.table('customers').select('reward_points, store_credit_usd, green_badges').execute()
@@ -138,22 +136,23 @@ def get_dashboard_metrics(selected_year: int = None) -> Dict[str, Any]:
         {"label": "Avg pts per customer", "value": f"{avg_pts:.0f} pts"}
     ]
 
-    # 7. Recent Passports
-    # Join passports with skus and brands
+    # 7. Recent Passports (only 1st and 2nd owners)
     recent_passports_res = supabase.table('passports')\
         .select('id, sustainability_score, created_at, status, ownership_count, skus(name, brands(code))')\
+        .lte('ownership_count', 2)\
         .order('created_at', desc=True)\
         .limit(10)\
         .execute()
     
     passport_activity = []
     for p in recent_passports_res.data:
+        owner_label = "1st owner" if (p['ownership_count'] or 1) == 1 else "2nd owner"
         passport_activity.append({
             "id": p['id'],
             "product": p.get('skus', {}).get('name', 'Unknown'),
             "brand_code": p.get('skus', {}).get('brands', {}).get('code', '??'),
             "status": p['status'],
-            "owner": "1st owner" if (p['ownership_count'] or 1) == 1 else f"{p['ownership_count']}th owner",
+            "owner": owner_label,
             "score": p['sustainability_score'],
             "date": p['created_at']
         })
