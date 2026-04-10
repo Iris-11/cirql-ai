@@ -216,3 +216,12 @@ class RoutingResponse(BaseModel):
     partner: str
     reason: str
     impact: Impact
+
+
+class FullPipelineResult(BaseModel):
+    listing_id: str = Field(..., description="resale_listings.id created for this submission.")
+    confidence_score: float = Field(..., description="E1 confidence score (0–1).")
+    pending_review: bool = Field(..., description="True if confidence < 0.7 — sent for manual review without running E3.")
+    e1_result: VerificationResult
+    e2_result: ConditionResponse
+    e3_result: Optional[RoutingResponse] = Field(default=None, description="E3 routing result. None if pending_review=True.")

@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from routes import e1_verify, e2_condition, e1e2_pipeline, e3_router
+from routes import e1_verify, e2_condition, e1e2_pipeline, e3_router, auth, upload, user
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,3 +33,12 @@ app.include_router(e1e2_pipeline.router, prefix="/api/v1/product", tags=["E1+E2 
 
 # E3 — Routing
 app.include_router(e3_router.router, prefix="/api/v1/routing", tags=["E3 — Routing"])
+
+# Auth
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
+
+# Image upload
+app.include_router(upload.router, prefix="/api/v1/product", tags=["Upload"])
+
+# User
+app.include_router(user.router, prefix="/api/v1/user", tags=["User"])
