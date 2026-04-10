@@ -1,0 +1,5 @@
+# Claude Code settings (local only)
+.claude/
+
+# Local image generation folder
+backend/image_gen/
