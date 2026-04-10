@@ -1,0 +1,27 @@
+SUCCESS: Supabase client initialized.
+SUCCESS: Successfully reached Supabase Auth API.
+
+--- Database Schema (Tables & Views) ---
+- brands (Table)
+- customers (Table)
+- esg_reports (Table)
+- partners (Table)
+- passport_events (Table)
+- passports (Table)
+- resale_listings (Table)
+- skus (Table)
+- sustainability_scores (Table)
+- v_lifecycle_stages (View)
+- v_passports_by_brand (View)
+- v_recent_passport_events (View)
+- v_score_distribution (View)
+
+SUCCESS: Successfully reached Supabase Database API (Admin).
+INFO: Found 5 brands in the 'brands' table.
+
+--- Brands Data ---
+- id: a0000000-0000-0000-0000-000000000001, code: WS, name: Williams-Sonoma, created_at: 2026-04-09T09:27:09.820692+00:00
+- id: a0000000-0000-0000-0000-000000000002, code: PB, name: Pottery Barn, created_at: 2026-04-09T09:27:09.820692+00:00
+- id: a0000000-0000-0000-0000-000000000003, code: WE, name: West Elm, created_at: 2026-04-09T09:27:09.820692+00:00
+- id: a0000000-0000-0000-0000-000000000004, code: PBK, name: PB Kids, created_at: 2026-04-09T09:27:09.820692+00:00
+- id: a0000000-0000-0000-0000-000000000005, code: PBT, name: PB Teen, created_at: 2026-04-09T09:27:09.820692+00:00

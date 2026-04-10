@@ -9,12 +9,14 @@ import {
   Users, 
   BarChart3, 
   Settings,
-  Circle
+  Circle,
+  ShieldCheck
 } from 'lucide-react';
 
 const Sidebar = () => {
   const menuItems = [
     { name: 'Dashboard', icon: LayoutDashboard, path: '/' },
+    { name: 'Approvals', icon: ShieldCheck, path: '/approvals' },
     { name: 'Products', icon: Shirt, path: '/products' },
     { name: 'Passports', icon: FileText, path: '/passports' },
     { name: 'Resale', icon: Repeat, path: '/resale' },

@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Leaf, 
@@ -27,15 +27,6 @@ import {
   ResponsiveContainer,
   Cell
 } from 'recharts';
-import { 
-  getDashboardStats, 
-  resaleActivityData, 
-  scoreDistribution,
-  brandDistribution,
-  lifecycleDataStats,
-  rewardActivityData,
-  Passports
-} from '../data/mockData';
 
 // Animation Variants
 const containerVariants = {
@@ -67,7 +58,7 @@ const MetricCard = ({ label, value, subtext, trend, isDown, color }) => (
       </div>
     </div>
     <div className="metric-body">
-      <h3 className="value-md">{value}</h3>
+      <h3 className={`value-md ${color}`}>{value}</h3>
       <p className="sub-xs">{subtext}</p>
     </div>
     <div className="card-shine" />
@@ -75,14 +66,42 @@ const MetricCard = ({ label, value, subtext, trend, isDown, color }) => (
 );
 
 const Dashboard = () => {
-  const stats = useMemo(() => getDashboardStats(), []);
-  
+  const [selectedYear, setSelectedYear] = useState('');
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setData(null); // Reset data to ensure a fresh view
+      try {
+        const timestamp = new Date().getTime();
+        const baseUrl = 'http://localhost:8000/api/dashboard/metrics';
+        const url = selectedYear 
+          ? `${baseUrl}?year=${selectedYear}&_t=${timestamp}` 
+          : `${baseUrl}?_t=${timestamp}`;
+        
+        const response = await fetch(url);
+        if (!response.ok) throw new Error('Failed to fetch dashboard metrics');
+        const json = await response.json();
+        setData(json);
+      } catch (err) {
+        setError(err.message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [selectedYear]);
+
   const handleDownloadReport = (type = 'full') => {
+// ... (rest of the handleDownloadReport code)
     const csvContent = [
       ['Digital Product Passport (DPP) - Executive Report'],
       ['Generated At', new Date().toLocaleString()],
-      ['Compliance Rate', '98.4%'],
-      ['Total DPP-Ready Passports', '1,284'],
+      ['Compliance Rate', data?.compliance?.rate + '%' || '98.4%'],
+      ['Total DPP-Ready Passports', data?.compliance?.dpp_ready || '1,284'],
       [''],
       ['Metric', 'Status', 'Verified By'],
       ['Material origin logged', 'Pass', 'AI Core'],
@@ -103,6 +122,10 @@ const Dashboard = () => {
     link.click();
     document.body.removeChild(link);
   };
+
+  if (loading) return <div className="p-40 text-center color-white">Loading Premium Dashboard...</div>;
+  if (error) return <div className="p-40 text-center text-red-500">Error: {error}</div>;
+  if (!data) return null;
 
   return (
     <motion.div 
@@ -133,7 +156,7 @@ const Dashboard = () => {
 
       {/* 1. Metric Command Center (6 Units) */}
       <section className="grid-row-6">
-        {stats.metrics.map(m => (
+        {data.metrics.map(m => (
           <MetricCard key={m.id} {...m} />
         ))}
       </section>
@@ -146,13 +169,26 @@ const Dashboard = () => {
           whileHover={{ y: -5, scale: 1.01 }}
           className="card card-glass p-24 interactive-card"
         >
-          <div className="card-top">
-            <h4 className="title-sm">Resale Activity — Last 90 Days</h4>
-            <p className="label-xs opacity-60">Number of resale transactions per week</p>
+          <div className="card-top flex-between">
+            <div className="title-group">
+              <h4 className="title-sm">Resale Activity ({data.resaleYear})</h4>
+              <p className="label-xs opacity-60">Number of resale transactions per month</p>
+            </div>
+            <div className="filter-group">
+              <select 
+                className="select-mini glass"
+                value={selectedYear || data.resaleYear}
+                onChange={(e) => setSelectedYear(e.target.value)}
+              >
+                {data.availableYears?.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div className="chart-box mt-20">
             <ResponsiveContainer width="100%" height={240}>
-              <BarChart data={resaleActivityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <BarChart data={data.resaleActivityData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.03)" />
                 <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} dy={10} />
                 <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#64748B' }} />
@@ -175,7 +211,7 @@ const Dashboard = () => {
             <p className="label-xs opacity-60">Products scored by AI engine across all brands</p>
           </div>
           <div className="dist-list mt-24">
-            {scoreDistribution.map(item => (
+            {data.scoreDistribution.map(item => (
               <div key={item.label} className="dist-item">
                 <div className="dist-meta">
                   <span className="label-xs-bold">{item.label}</span>
@@ -223,14 +259,14 @@ const Dashboard = () => {
               </tr>
             </thead>
             <tbody>
-              {Passports.slice(0, 6).map((p, i) => (
+              {data.passports.map((p, i) => (
                 <tr key={p.id} className="row-hover">
-                  <td className="font-semibold">{i % 2 === 0 ? 'Cast Iron Skillet' : 'Linen Sofa 2-Seat'}</td>
-                  <td><span className={`brand-tag ${i % 3 === 0 ? 'ws' : i % 3 === 1 ? 'pb' : 'we'}`}>{i % 3 === 0 ? 'WS' : i % 3 === 1 ? 'PB' : 'WE'}</span></td>
-                  <td><span className={`event-badge ${i % 2 === 0 ? 'resold' : 'claimed'}`}>{i % 2 === 0 ? 'Resold' : 'Claimed'}</span></td>
-                  <td className="opacity-70">{i % 2 === 0 ? '2nd owner' : '1st owner'}</td>
-                  <td className={`font-bold ${p.sustainability_score > 80 ? 'emerald' : 'gold'}`}>{p.sustainability_score}</td>
-                  <td className="opacity-50 text-xs">Apr {6 - i}</td>
+                  <td className="font-semibold">{p.product}</td>
+                  <td><span className={`brand-tag ${p.brand_code?.toLowerCase()}`}>{p.brand_code}</span></td>
+                  <td><span className={`event-badge ${p.status}`}>{p.status}</span></td>
+                  <td className="opacity-70">{p.owner}</td>
+                  <td className={`font-bold ${p.score > 80 ? 'emerald' : 'gold'}`}>{p.score}</td>
+                  <td className="opacity-50 text-xs">{new Date(p.date).toLocaleDateString()}</td>
                 </tr>
               ))}
             </tbody>
@@ -250,11 +286,11 @@ const Dashboard = () => {
           </div>
           <div className="compliance-hero mt-20">
             <div className="comp-stat">
-              <h2 className="emerald">1,284</h2>
+              <h2 className="emerald">{data.compliance.dpp_ready}</h2>
               <p className="label-xs opacity-60">passports DPP-ready</p>
             </div>
             <div className="comp-stat text-right">
-              <h2 className="emerald">98.4%</h2>
+              <h2 className="emerald">{data.compliance.rate}%</h2>
               <p className="label-xs opacity-60">compliance rate</p>
             </div>
           </div>
@@ -286,7 +322,7 @@ const Dashboard = () => {
         <motion.div variants={itemVariants} whileHover={{ y: -5, scale: 1.02 }} className="card card-glass p-20 interactive-card">
           <h4 className="title-xs mb-16">Passports by Brand</h4>
           <div className="side-dist">
-            {brandDistribution.map(b => (
+            {data.brandDistribution.map(b => (
               <div key={b.brand} className="side-row">
                 <div className="side-label">
                   <span className="label-xs">{b.brand}</span>
@@ -306,13 +342,13 @@ const Dashboard = () => {
         <motion.div variants={itemVariants} whileHover={{ y: -5, scale: 1.02 }} className="card card-glass p-20 interactive-card">
           <h4 className="title-xs mb-16">Products by Lifecycle Stage</h4>
           <div className="side-dist">
-            {lifecycleDataStats.map(l => (
+            {data.lifecycleDataStats.map(l => (
               <div key={l.stage} className="side-row">
                 <div className="side-label">
                   <span className="label-xs">{l.stage}</span>
                   <span className="label-xs opacity-40">{l.count} products</span>
                 </div>
-                <div className="mini-progress"><div className="fill" style={{ width: `${(l.count / 1284) * 100}%`, background: l.color }} /></div>
+                <div className="mini-progress"><div className="fill" style={{ width: `${(l.count / data.metrics[0].value.replace(/,/g, '')) * 100}%`, background: l.color }} /></div>
               </div>
             ))}
           </div>
@@ -323,7 +359,7 @@ const Dashboard = () => {
         <motion.div variants={itemVariants} whileHover={{ y: -5, scale: 1.02 }} className="card card-glass p-20 interactive-card">
           <h4 className="title-xs mb-16">Reward Activity</h4>
           <div className="metrics-list">
-            {rewardActivityData.map(r => (
+            {data.rewardActivityData.map(r => (
               <div key={r.label} className="list-item-row">
                 <span className="label-xs opacity-60">{r.label}</span>
                 <span className="label-xs-bold emerald">{r.value}</span>
@@ -335,6 +371,20 @@ const Dashboard = () => {
       </section>
 
       <style jsx="true">{`
+        .flex-between { display: flex; justify-content: space-between; align-items: flex-start; }
+        .select-mini { 
+          padding: 4px 8px; 
+          border-radius: 6px; 
+          font-size: 0.75rem; 
+          font-weight: 600; 
+          border: 1px solid rgba(0,0,0,0.05); 
+          cursor: pointer; 
+          background: rgba(255,255,255,0.1);
+          color: #1E293B;
+          outline: none;
+        }
+        .select-mini:hover { border-color: var(--color-brand-accent); }
+        
         .dashboard-densities { display: flex; flex-direction: column; gap: 20px; padding: 10px 0 40px; }
         .dashboard-header-sleek { display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; }
         .h-main { font-size: 1.5rem; font-weight: 700; margin: 0; color: #1E293B; }
@@ -391,9 +441,10 @@ const Dashboard = () => {
         .brand-tag.ws { background: #E6F7EF; color: #10B981; border: 1px solid rgba(16, 185, 129, 0.2); }
         .brand-tag.pb { background: #EFF6FF; color: #3B82F6; border: 1px solid rgba(59, 130, 246, 0.2); }
         .brand-tag.we { background: #FFF7ED; color: #F59E0B; border: 1px solid rgba(245, 158, 11, 0.2); }
-        .event-badge { padding: 2px 8px; border-radius: 100px; font-size: 0.65rem; font-weight: 700; border: 1px solid transparent; }
-        .event-badge.resold { background: #F1F5F9; color: #64748B; border-color: #E2E8F0; }
+        .event-badge { padding: 2px 8px; border-radius: 100px; font-size: 0.65rem; font-weight: 700; border: 1px solid transparent; text-transform: capitalize; }
+        .event-badge.sold, .event-badge.active { background: #E6F7EF; color: #10B981; border-color: rgba(16, 185, 129, 0.2); }
         .event-badge.claimed { background: #FEF3C7; color: #D97706; border-color: #FCD34D; }
+        .event-badge.recycled { background: #F1F5F9; color: #64748B; border-color: #E2E8F0; }
 
         .compliance-hero { display: flex; justify-content: space-between; background: #E6F7EF; padding: 16px; border-radius: 10px; }
         .comp-stat h2 { margin: 0; font-size: 1.5rem; font-weight: 800; }
@@ -411,6 +462,8 @@ const Dashboard = () => {
         .list-item-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid rgba(0,0,0,0.02); }
         
         .emerald { color: var(--color-brand-accent); }
+        .gold { color: #F59E0B; }
+        .red { color: #EF4444; }
         .gold { color: #B4942D; }
         .rotate-90 { transform: rotate(90deg); }
         .flex-gap-8 { display: flex; gap: 8px; align-items: center; }
