@@ -11,7 +11,6 @@ import { ArrowLeft, Camera, ShieldCheck, RefreshCw, Award, Leaf, Recycle } from 
 import { LinearGradient } from "expo-linear-gradient";
 import { Card } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
-import { Button } from "../components/ui/Button";
 import type { RootStackParamList } from "../types";
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
@@ -149,12 +148,6 @@ export function HowItWorksScreen() {
             <Text className="text-sm text-white/70 text-center mt-2">
               Start verifying your products and earn rewards today.
             </Text>
-            <Button
-              title="Verify My First Product"
-              onPress={() => navigation.navigate("VerifyProduct")}
-              variant="secondary"
-              className="mt-5"
-            />
           </LinearGradient>
         </View>
       </ScrollView>

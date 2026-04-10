@@ -218,6 +218,11 @@ class RoutingResponse(BaseModel):
     impact: Impact
 
 
+class ConfirmActionRequest(BaseModel):
+    listing_id: str = Field(..., description="resale_listings.id to finalize.")
+    action: Literal["resale", "donate", "recycle"] = Field(..., description="User's chosen next-life action.")
+
+
 class FullPipelineResult(BaseModel):
     listing_id: str = Field(..., description="resale_listings.id created for this submission.")
     confidence_score: float = Field(..., description="E1 confidence score (0–1).")

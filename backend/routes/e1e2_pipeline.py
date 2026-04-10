@@ -11,11 +11,11 @@ from fastapi import APIRouter, HTTPException
 from pydantic import ValidationError
 
 from models.schemas import (
-    ProductSubmission, FullPipelineResult, RoutingResponse, Impact
+    ProductSubmission, FullPipelineResult, RoutingResponse, Impact, ConfirmActionRequest
 )
 from services.e1e2_pipeline import run_full_assessment
 from services.e3_service import get_routing_decision
-from utils.supabase_client import save_full_assessment
+from utils.supabase_client import save_full_assessment, confirm_listing_action
 from utils.constants import PARTNERS, EMISSION_FACTOR, LANDFILL_FACTOR
 from utils.validators import validate_ai_response
 
@@ -99,3 +99,18 @@ async def full_assessment_endpoint(submission: ProductSubmission) -> FullPipelin
         raise
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Pipeline error: {str(exc)}")
+
+
+@router.post(
+    "/confirm-action",
+    summary="Confirm user's chosen next-life action (resale / donate / recycle)",
+)
+async def confirm_action_endpoint(request: ConfirmActionRequest):
+    """
+    Called after the user selects an action on the result screen.
+    Finalizes listing status and passport status in the DB.
+    """
+    success = confirm_listing_action(request.listing_id, request.action)
+    if not success:
+        raise HTTPException(status_code=500, detail="Failed to confirm action. Please try again.")
+    return {"ok": True, "listing_id": request.listing_id, "action": request.action}

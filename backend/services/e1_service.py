@@ -25,6 +25,7 @@ load_dotenv()
 
 from models.schemas import ProductSubmission, VerificationResult
 from utils.geo_utils import validate_geo
+from utils.supabase_client import get_supabase_client
 
 # ── Configure Groq ────────────────────────────────────────────────────────────
 _API_KEY = os.environ.get("GROQ_API_KEY", "")
@@ -50,6 +51,17 @@ async def _fetch_image(url: str, client: httpx.AsyncClient) -> Optional[bytes]:
         return None
 
 
+def _fetch_reference_images_from_db(sku_code: str) -> Optional[dict]:
+    """Fetch reference_images from skus table by sku_code."""
+    try:
+        client = get_supabase_client(use_admin=True)
+        result = client.table("skus").select("reference_images").eq("sku_code", sku_code).single().execute()
+        return result.data.get("reference_images") if result.data else None
+    except Exception as e:
+        print(f"[e1_service] Could not fetch reference images for SKU {sku_code}: {e}")
+        return None
+
+
 async def _fetch_all_images(
     submission: ProductSubmission,
 ) -> Tuple[List[dict], List[Tuple[str, bytes]], Optional[dict]]:
@@ -62,7 +74,12 @@ async def _fetch_all_images(
         ref_part          — Groq image_url part for reference image or None
     """
     ref_url: Optional[str] = None
+    # Use reference images from passport if provided; otherwise fetch from SKUs table
     ref_images = submission.passport.reference_images
+    if not ref_images and submission.passport.sku_code:
+        ref_images = _fetch_reference_images_from_db(submission.passport.sku_code)
+        if ref_images:
+            print(f"[e1_service] Fetched reference images from DB for SKU {submission.passport.sku_code}")
     if ref_images:
         PREFERRED_ANGLES = ["front", "top", "side_left", "side_right", "bottom"]
         for angle in PREFERRED_ANGLES:

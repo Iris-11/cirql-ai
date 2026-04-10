@@ -69,6 +69,20 @@ export async function fullAssessment(
 }
 
 /**
+ * Confirm user's chosen action after seeing results.
+ * POST /api/v1/product/confirm-action
+ */
+export async function confirmAction(
+  listingId: string,
+  action: "resale" | "donate" | "recycle"
+): Promise<void> {
+  await apiClient.post("/product/confirm-action", {
+    listing_id: listingId,
+    action,
+  });
+}
+
+/**
  * E3 — Route product (resale / donate / recycle)
  * POST /api/v1/routing/route-product
  */

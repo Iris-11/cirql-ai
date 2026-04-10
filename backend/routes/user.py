@@ -51,7 +51,7 @@ def get_user_passports(customer_id: str):
                 "manufacture_date, reference_images, required_angles, brands(name))"
             )
             .eq("current_owner_id", customer_id)
-            .in_("status", ["active", "listed"])
+            .in_("status", ["active"])
             .execute()
         )
     except Exception as e:
